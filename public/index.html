@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mercado Livre Affiliate AI Agent Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- LOGIN SCREEN OVERLAY -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-card">
+            <div class="login-header">
+                <i class="fa-solid fa-robot login-logo-icon"></i>
+                <h2>AgenteML <span>AI</span></h2>
+                <p>Insira seus dados de acesso para entrar no painel.</p>
+            </div>
+            <form id="login-form" class="login-form">
+                <!-- Backend API input (only visible if hosted on Firebase/remote) -->
+                <div class="form-group" id="backend-url-group" style="display: none;">
+                    <label for="login-backend-url">URL do Backend API</label>
+                    <input type="text" id="login-backend-url" placeholder="https://seu-backend.render.com">
+                    <small>Seu backend FastAPI em nuvem (CORS ativado).</small>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Senha de Acesso</label>
+                    <div class="input-password-wrapper">
+                        <input type="password" id="login-password" placeholder="Digite a senha do painel" required>
+                        <button type="button" class="toggle-password" onclick="togglePasswordVisibility('login-password')">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="login-error-msg" class="login-error-msg" style="display: none;">
+                    <i class="fa-solid fa-triangle-exclamation"></i> <span>Senha incorreta.</span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">
+                    <i class="fa-solid fa-right-to-bracket"></i> Acessar Painel
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTAINER -->
+    <div class="app-container" id="app-container" style="display: none;">
+        
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-logo">
+                <i class="fa-solid fa-robot logo-icon"></i>
+                <div class="logo-text">
+                    <h1>AgenteML <span>AI</span></h1>
+                    <p>Agente Automatizado de Ofertas & Afiliados</p>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-badge" id="scheduler-status">
+                    <span class="status-dot"></span>
+                    <span class="status-label">Agendador Inativo</span>
+                </div>
+                <div class="next-run-badge">
+                    <i class="fa-regular fa-clock"></i>
+                    <span>Próximo disparo: <strong id="next-run-time">--:--</strong></span>
+                </div>
+                <button onclick="logout()" class="btn-icon" title="Sair do Painel" style="margin-left: 10px; font-size: 1.15rem; color: var(--danger-color);">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="app-content">
+            
+            <!-- LEFT PANEL: CONFIGURATION -->
+            <section class="panel panel-config">
+                <div class="panel-header">
+                    <i class="fa-solid fa-sliders"></i>
+                    <h2>Configurações do Agente</h2>
+                </div>
+                <form id="config-form" class="panel-body">
+                    <!-- Mercado Livre Section -->
+                    <div class="form-section">
+                        <h3><i class="fa-solid fa-tags"></i> Mercado Livre</h3>
+                        <div class="form-group">
+                            <label for="MERCADO_LIVRE_AFFILIATE_ID">ID de Afiliado</label>
+                            <input type="text" id="MERCADO_LIVRE_AFFILIATE_ID" placeholder="Ex: 12345678" required>
+                            <small>Seu ID numérico para rastreamento de comissões.</small>
+                        </div>
+                    </div>
+
+                    <!-- Security Section -->
+                    <div class="form-section">
+                        <h3><i class="fa-solid fa-shield-halved"></i> Segurança do Painel</h3>
+                        <div class="form-group">
+                            <label for="ADMIN_PASSWORD">Senha do Painel</label>
+                            <div class="input-password-wrapper">
+                                <input type="password" id="ADMIN_PASSWORD" placeholder="Altere a senha de acesso" required>
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('ADMIN_PASSWORD')">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                            </div>
+                            <small>Altere a senha usada para fazer login neste painel.</small>
+                        </div>
+                    </div>
+
+                    <!-- AI Key Section -->
+                    <div class="form-section">
+                        <h3><i class="fa-solid fa-brain"></i> Inteligência Artificial</h3>
+                        <div class="form-group">
+                            <label for="GEMINI_API_KEY">Gemini API Key</label>
+                            <div class="input-password-wrapper">
+                                <input type="password" id="GEMINI_API_KEY" placeholder="Insira sua chave do Google AI Studio">
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('GEMINI_API_KEY')">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                            </div>
+                            <small>Chave para escrever as copies. Se vazia, usa o modelo de fallback padrão.</small>
+                        </div>
+                    </div>
+
+                    <!-- Email / SMTP Section -->
+                    <div class="form-section">
+                        <h3><i class="fa-solid fa-envelope"></i> E-mail (Servidor SMTP)</h3>
+                        <div class="form-row">
+                            <div class="form-group col-8">
+                                <label for="SMTP_SERVER">Servidor SMTP</label>
+                                <input type="text" id="SMTP_SERVER" placeholder="Ex: smtp.gmail.com" required>
+                            </div>
+                            <div class="form-group col-4">
+                                <label for="SMTP_PORT">Porta</label>
+                                <input type="number" id="SMTP_PORT" placeholder="587" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="SMTP_USER">Usuário / E-mail do Rementente</label>
+                            <input type="email" id="SMTP_USER" placeholder="seu-email@gmail.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="SMTP_PASSWORD">Senha do E-mail (ou Senha de App)</label>
+                            <div class="input-password-wrapper">
+                                <input type="password" id="SMTP_PASSWORD" placeholder="Senha do e-mail ou Token de aplicativo" required>
+                                <button type="button" class="toggle-password" onclick="togglePasswordVisibility('SMTP_PASSWORD')">
+                                    <i class="fa-regular fa-eye"></i>
+                                </button>
+                            </div>
+                            <small>Para contas Gmail, utilize uma "Senha de App" gerada na conta Google.</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="RECEIVER_EMAIL">E-mail do Destinatário</label>
+                            <input type="email" id="RECEIVER_EMAIL" placeholder="recebedor-ofertas@gmail.com" required>
+                            <small>E-mail onde você deseja receber as promoções estruturadas.</small>
+                        </div>
+                        <button type="button" id="btn-test-email" class="btn btn-secondary">
+                            <i class="fa-regular fa-paper-plane"></i> Testar Conexão SMTP
+                        </button>
+                    </div>
+
+                    <!-- Schedule Section -->
+                    <div class="form-section">
+                        <h3><i class="fa-regular fa-calendar-check"></i> Agendamento Diário</h3>
+                        <div class="form-group">
+                            <label for="POST_TIMES">Horários de Disparo (separados por vírgula)</label>
+                            <input type="text" id="POST_TIMES" placeholder="Ex: 09:00, 13:00, 19:00" required>
+                            <small>Os horários em que o agente buscará promoções e enviará para seu e-mail.</small>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary btn-block">
+                            <i class="fa-regular fa-floppy-disk"></i> Salvar Configurações
+                        </button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- RIGHT PANEL: CONTROL BOARD, LOGS & HISTORY -->
+            <section class="right-column">
+                
+                <!-- CONTROL BOARD -->
+                <div class="panel panel-control">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-gamepad"></i>
+                        <h2>Painel de Controle</h2>
+                    </div>
+                    <div class="panel-body control-actions">
+                        <button id="btn-trigger" class="btn btn-gradient">
+                            <i class="fa-solid fa-bolt"></i> Executar Agente Agora
+                        </button>
+                        
+                        <div class="status-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Última Execução</span>
+                                <span class="summary-value" id="last-run-time">Nenhuma</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Resultado</span>
+                                <span class="summary-value" id="last-run-status">Aguardando</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Itens Enviados</span>
+                                <span class="summary-value" id="last-run-count">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LOGS BOX -->
+                <div class="panel panel-logs">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-terminal"></i>
+                        <h2>Console de Logs</h2>
+                        <button class="btn-icon" onclick="fetchLogs()" title="Atualizar Logs">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                    <div class="panel-body console-body" id="logs-console">
+                        [Sistema] Carregando logs...
+                    </div>
+                </div>
+
+                <!-- HISTORY OF OFFERS -->
+                <div class="panel panel-history">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-history"></i>
+                        <h2>Histórico de Ofertas Geradas</h2>
+                    </div>
+                    <div class="panel-body history-body" id="history-container">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-box-open"></i>
+                            <p>Nenhuma oferta gerada ainda. Execute o agente acima para iniciar!</p>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+        </main>
+        
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <p>&copy; 2026 AgenteML AI. Feito para potencializar suas vendas como afiliado Mercado Livre.</p>
+        </footer>
+
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast">
+        <i id="toast-icon" class="fa-solid"></i>
+        <span id="toast-message">Mensagem aqui</span>
+    </div>
+
+    <!-- Script Entrypoint -->
+    <script src="app.js"></script>
+</body>
+</html>
