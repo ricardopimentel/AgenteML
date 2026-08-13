@@ -73,22 +73,26 @@
                     <span class="status-dot"></span>
                     <span class="status-label">Agendador Inativo</span>
                 </div>
-                <div class="next-run-badge">
-                    <i class="fa-solid fa-server"></i>
-                    <span>Hora do Servidor (BR): <strong id="server-time">--:--:--</strong></span>
-                </div>
-                <div class="next-run-badge">
-                    <i class="fa-regular fa-clock"></i>
-                    <span>Próximo disparo: <strong id="next-run-time">--:--:--</strong></span>
-                </div>
-                <button id="btn-install-app" class="btn btn-secondary" style="display: none; margin-left: 10px; padding: 6px 12px; font-size: 0.85rem;">
-                    <i class="fa-solid fa-download"></i> Instalar App
-                </button>
                 <button onclick="logout()" class="btn-icon" title="Sair do Painel" style="margin-left: 10px; font-size: 1.15rem; color: var(--danger-color);">
                     <i class="fa-solid fa-power-off"></i>
                 </button>
             </div>
         </header>
+
+        <!-- STATUS BAR -->
+        <div class="app-status-bar">
+            <div class="next-run-badge">
+                <i class="fa-solid fa-server"></i>
+                <span>Hora do Servidor (BR): <strong id="server-time">--:--:--</strong></span>
+            </div>
+            <div class="next-run-badge">
+                <i class="fa-regular fa-clock"></i>
+                <span>Próximo disparo: <strong id="next-run-time">--:--:--</strong></span>
+            </div>
+            <button id="btn-install-app" class="btn btn-secondary" style="display: none; padding: 6px 12px; font-size: 0.85rem;">
+                <i class="fa-solid fa-download"></i> Instalar App
+            </button>
+        </div>
 
         <!-- MAIN LAYOUT -->
         <main class="app-content">
