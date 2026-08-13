@@ -185,9 +185,12 @@ def configure_scheduler():
             
             job_id = f"deals_job_{hour:02d}_{minute:02d}"
             
+            import pytz
+            tz = pytz.timezone("America/Sao_Paulo")
+            
             scheduler.add_job(
                 run_agent_flow,
-                trigger=CronTrigger(hour=hour, minute=minute),
+                trigger=CronTrigger(hour=hour, minute=minute, timezone=tz),
                 id=job_id,
                 name=f"Envio de Ofertas {hour:02d}:{minute:02d}"
             )
@@ -200,7 +203,7 @@ def configure_scheduler():
 
 def get_next_run():
     """
-    Returns the timestamp of the next scheduled task execution.
+    Returns the timestamp of the next scheduled task execution in America/Sao_Paulo timezone.
     """
     jobs = scheduler.get_jobs()
     if not jobs:
@@ -209,16 +212,27 @@ def get_next_run():
     next_runs = [job.next_run_time for job in jobs if job.next_run_time]
     if not next_runs:
         return None
-    return min(next_runs).strftime("%Y-%m-%d %H:%M:%S")
+    
+    import pytz
+    br_tz = pytz.timezone("America/Sao_Paulo")
+    closest_run = min(next_runs)
+    
+    if closest_run.tzinfo:
+        closest_run = closest_run.astimezone(br_tz)
+        
+    return closest_run.strftime("%d/%m/%Y %H:%M:%S")
 
 def get_agent_status():
     """
     Returns general stats for the dashboard.
     """
+    import pytz
+    br_tz = pytz.timezone("America/Sao_Paulo")
+    
     return {
         "scheduler_running": scheduler.running,
         "jobs": [
-            {"id": job.id, "name": job.name, "next_run": job.next_run_time.strftime("%Y-%m-%d %H:%M:%S") if job.next_run_time else "Pausado"}
+            {"id": job.id, "name": job.name, "next_run": job.next_run_time.astimezone(br_tz).strftime("%d/%m/%Y %H:%M:%S") if job.next_run_time else "Pausado"}
             for job in scheduler.get_jobs()
         ],
         "next_run": get_next_run(),

@@ -35,6 +35,8 @@ const lastRunCount = document.getElementById("last-run-count");
 let statusInterval = null;
 let logsInterval = null;
 let logRefreshInterval = null; // Fast logs during execution
+let serverTimeOffset = 0;
+let clockTickingInterval = null;
 
 // Initialize Dashboard
 document.addEventListener("DOMContentLoaded", () => {
@@ -151,6 +153,7 @@ function showLogin() {
     if (statusInterval) clearInterval(statusInterval);
     if (logsInterval) clearInterval(logsInterval);
     if (logRefreshInterval) clearInterval(logRefreshInterval);
+    if (clockTickingInterval) clearInterval(clockTickingInterval);
 }
 
 // Show app dashboard and load data
@@ -170,6 +173,9 @@ function showApp() {
     
     if (logsInterval) clearInterval(logsInterval);
     logsInterval = setInterval(fetchLogs, 15000);
+    
+    // Start ticking clock
+    startTickingClock();
 }
 
 // Logout action
@@ -304,6 +310,14 @@ async function fetchStatus() {
         if (!response.ok) throw new Error("Falha ao buscar status");
         const data = await response.json();
         
+        // Update Server Time Offset
+        if (data.server_time_br) {
+            const serverDate = new Date(data.server_time_br.replace(" ", "T"));
+            if (!isNaN(serverDate.getTime())) {
+                serverTimeOffset = serverDate.getTime() - Date.now();
+            }
+        }
+        
         // Update Scheduler State
         if (data.scheduler_running) {
             schedulerStatus.className = "status-badge active";
@@ -430,6 +444,27 @@ async function testSMTP() {
     }
 }
 
+// Start ticking server clock
+function startTickingClock() {
+    if (clockTickingInterval) clearInterval(clockTickingInterval);
+    
+    const serverTimeEl = document.getElementById("server-time");
+    
+    clockTickingInterval = setInterval(() => {
+        const serverNow = new Date(Date.now() + serverTimeOffset);
+        
+        const day = String(serverNow.getDate()).padStart(2, '0');
+        const month = String(serverNow.getMonth() + 1).padStart(2, '0');
+        const year = serverNow.getFullYear();
+        
+        const hours = String(serverNow.getHours()).padStart(2, '0');
+        const minutes = String(serverNow.getMinutes()).padStart(2, '0');
+        const seconds = String(serverNow.getSeconds()).padStart(2, '0');
+        
+        serverTimeEl.textContent = `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+    }, 1000);
+}
+
 // Fetch and Render History
 async function fetchHistory() {
     try {
@@ -495,6 +530,12 @@ async function fetchHistory() {
                     </div>
                     
                     <div class="offer-actions">
+                        <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')">
+                            <i class="fa-regular fa-image"></i> Copiar Imagem
+                        </button>
+                        <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy)}" class="btn-whatsapp" target="_blank">
+                            <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
+                        </a>
                         <a href="${item.affiliate_link}" class="btn-link-ml" target="_blank">
                             <i class="fa-solid fa-up-right-from-square"></i> Link de Afiliado
                         </a>
@@ -535,5 +576,68 @@ function copyToClipboard(button, runIndex, itemIndex) {
         });
     } catch (error) {
         showToast("Erro ao copiar dados do histórico.", "error");
+    }
+}
+
+// Copy Image to Clipboard using proxy endpoint and Canvas conversion
+async function copyImageToClipboard(button, imageUrl) {
+    const originalHTML = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>...`;
+    
+    try {
+        // Build the URL to our backend proxy image endpoint
+        const proxyUrl = getApiUrl("/api/proxy-image?url=" + encodeURIComponent(imageUrl));
+        
+        // Fetch the image blob
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error("Erro ao baixar imagem do servidor proxy.");
+        const blob = await response.blob();
+        
+        // Check if the clipboard API is supported
+        if (!navigator.clipboard || !window.ClipboardItem) {
+            throw new Error("API de Área de Transferência não suportada neste navegador.");
+        }
+        
+        // ClipboardItem only supports PNG. Convert it.
+        let pngBlob = blob;
+        if (blob.type !== "image/png") {
+            pngBlob = await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = img.naturalWidth;
+                    canvas.height = img.naturalHeight;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0);
+                    canvas.toBlob((resultBlob) => {
+                        if (resultBlob) resolve(resultBlob);
+                        else reject(new Error("Falha na conversão para PNG."));
+                    }, "image/png");
+                };
+                img.onerror = () => reject(new Error("Erro ao carregar imagem para conversão."));
+                img.src = URL.createObjectURL(blob);
+            });
+        }
+        
+        // Copy to clipboard
+        await navigator.clipboard.write([
+            new ClipboardItem({ "image/png": pngBlob })
+        ]);
+        
+        button.className = "btn-copy-image copied";
+        button.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+        showToast("Imagem copiada! Cole (Ctrl+V) no WhatsApp.", "success");
+        
+        setTimeout(() => {
+            button.className = "btn-copy-image";
+            button.innerHTML = originalHTML;
+            button.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        showToast("Falha ao copiar imagem: " + error.message, "error");
+        button.innerHTML = originalHTML;
+        button.disabled = false;
     }
 }

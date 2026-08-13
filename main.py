@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Depends
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Header, Depends, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -73,7 +73,11 @@ def update_config(config_data: ConfigSchema):
 
 @app.get("/api/status", dependencies=[Depends(verify_auth)])
 def get_status():
-    return scheduler.get_agent_status()
+    import datetime, pytz
+    status_data = scheduler.get_agent_status()
+    tz = pytz.timezone("America/Sao_Paulo")
+    status_data["server_time_br"] = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+    return status_data
 
 @app.get("/api/history", dependencies=[Depends(verify_auth)])
 def get_history():
@@ -103,6 +107,20 @@ def test_email(data: TestEmailSchema):
         return {"status": "success", "message": message}
     else:
         raise HTTPException(status_code=400, detail=message)
+
+@app.get("/api/proxy-image")
+def proxy_image(url: str):
+    import requests
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+        }
+        r = requests.get(url, headers=headers, timeout=10)
+        if r.status_code == 200:
+            return Response(content=r.content, media_type=r.headers.get("content-type", "image/jpeg"))
+        raise HTTPException(status_code=r.status_code, detail="Failed to fetch image from source")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Mount static files from renamed directory "public".
 public_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
