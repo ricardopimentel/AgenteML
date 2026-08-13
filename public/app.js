@@ -1,6 +1,14 @@
 // API Base URL config (supports Firebase Hosting connection to remote FastAPI backends)
 let apiBaseUrl = localStorage.getItem("backend_url") || "";
 
+// API Endpoints
+const API_CONFIG = "/api/config";
+const API_STATUS = "/api/status";
+const API_HISTORY = "/api/history";
+const API_LOGS = "/api/logs";
+const API_TRIGGER = "/api/trigger";
+const API_TEST_EMAIL = "/api/test-email";
+
 // DOM Elements
 const loginOverlay = document.getElementById("login-overlay");
 const loginForm = document.getElementById("login-form");
