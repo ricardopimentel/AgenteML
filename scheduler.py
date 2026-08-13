@@ -6,7 +6,6 @@ from apscheduler.triggers.cron import CronTrigger
 from config import Config
 import scraper
 import ai_copywriter
-import mailer
 
 # Path to local history file
 HISTORY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "history.json")
@@ -109,41 +108,30 @@ def run_agent_flow():
             )
             copy_texts.append(copy)
             
-        # 3. Send email
-        log_message("Enviando e-mail com as ofertas estruturadas e anexos...")
-        success, message = mailer.send_deals_email(deals, copy_texts)
+        # 3. Save to history
+        log_message("Salvando ofertas estruturadas no histórico local...")
+        run_entry = {
+            "timestamp": timestamp_str,
+            "items": [
+                {
+                    "title": deal["title"],
+                    "price": deal["price"],
+                    "original_price": deal["original_price"],
+                    "discount": deal["discount"],
+                    "affiliate_link": deal["affiliate_link"],
+                    "image_url": deal["image_url"],
+                    "copy": copy
+                }
+                for deal, copy in zip(deals, copy_texts)
+            ]
+        }
+        save_to_history(run_entry)
         
-        if success:
-            log_message("E-mail enviado com sucesso para o usuário!")
-            
-            # Construct history entry
-            run_entry = {
-                "timestamp": timestamp_str,
-                "items": [
-                    {
-                        "title": deal["title"],
-                        "price": deal["price"],
-                        "original_price": deal["original_price"],
-                        "discount": deal["discount"],
-                        "affiliate_link": deal["affiliate_link"],
-                        "image_url": deal["image_url"],
-                        "copy": copy
-                    }
-                    for deal, copy in zip(deals, copy_texts)
-                ]
-            }
-            save_to_history(run_entry)
-            
-            latest_run_status.update({
-                "status": "Sucesso",
-                "items_count": len(deals)
-            })
-        else:
-            log_message(f"Erro no envio do e-mail: {message}")
-            latest_run_status.update({
-                "status": "Falha no Envio de E-mail",
-                "error": message
-            })
+        latest_run_status.update({
+            "status": "Sucesso",
+            "items_count": len(deals)
+        })
+        log_message("Fluxo executado e ofertas salvas com sucesso no histórico!")
             
     except Exception as e:
         err_msg = f"Erro geral na execução: {str(e)}"

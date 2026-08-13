@@ -6,7 +6,6 @@ from pydantic import BaseModel
 import os
 import scheduler
 from config import Config
-import mailer
 
 app = FastAPI(title="Agente de Ofertas Mercado Livre")
 
@@ -21,20 +20,8 @@ def verify_auth(x_admin_password: str = Header(None)):
 class ConfigSchema(BaseModel):
     MERCADO_LIVRE_AFFILIATE_ID: str
     GEMINI_API_KEY: str
-    SMTP_SERVER: str
-    SMTP_PORT: int
-    SMTP_USER: str
-    SMTP_PASSWORD: str
-    RECEIVER_EMAIL: str
     POST_TIMES: str
     ADMIN_PASSWORD: str
-
-class TestEmailSchema(BaseModel):
-    SMTP_SERVER: str
-    SMTP_PORT: int
-    SMTP_USER: str
-    SMTP_PASSWORD: str
-    RECEIVER_EMAIL: str
 
 class LoginSchema(BaseModel):
     password: str
@@ -93,20 +80,6 @@ def trigger_agent(background_tasks: BackgroundTasks):
     background_tasks.add_task(scheduler.run_agent_flow)
     return {"status": "success", "message": "Fluxo do agente disparado em segundo plano!"}
 
-@app.post("/api/test-email")
-def test_email(data: TestEmailSchema):
-    # Test SMTP doesn't check local header auth because it's validating raw inputs on the settings screen
-    success, message = mailer.send_test_email(
-        smtp_server=data.SMTP_SERVER,
-        smtp_port=data.SMTP_PORT,
-        smtp_user=data.SMTP_USER,
-        smtp_password=data.SMTP_PASSWORD,
-        receiver_email=data.RECEIVER_EMAIL
-    )
-    if success:
-        return {"status": "success", "message": message}
-    else:
-        raise HTTPException(status_code=400, detail=message)
 
 @app.get("/api/proxy-image")
 def proxy_image(url: str):

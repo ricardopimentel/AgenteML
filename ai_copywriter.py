@@ -16,8 +16,8 @@ def generate_whatsapp_copy(title, price, original_price, discount, link):
         
     try:
         genai.configure(api_key=api_key)
-        # We can use gemini-1.5-flash which is fast and inexpensive
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # We can use gemini-2.5-flash which is fast and inexpensive
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         prompt = f"""
         Você é um especialista em marketing digital e copywriter especializado em vendas em grupos de ofertas no WhatsApp.

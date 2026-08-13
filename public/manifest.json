@@ -1,0 +1,21 @@
+{
+  "short_name": "AgenteML",
+  "name": "Agente de Ofertas Mercado Livre AI",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#090b0f",
+  "theme_color": "#ffd700",
+  "display": "standalone",
+  "orientation": "portrait"
+}

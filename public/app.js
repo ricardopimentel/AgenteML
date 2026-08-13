@@ -26,6 +26,8 @@ const historyContainer = document.getElementById("history-container");
 
 const btnTrigger = document.getElementById("btn-trigger");
 const btnTestEmail = document.getElementById("btn-test-email");
+const btnInstallApp = document.getElementById("btn-install-app");
+let deferredPrompt = null;
 
 const lastRunTime = document.getElementById("last-run-time");
 const lastRunStatus = document.getElementById("last-run-status");
@@ -37,6 +39,10 @@ let logsInterval = null;
 let logRefreshInterval = null; // Fast logs during execution
 let serverTimeOffset = 0;
 let clockTickingInterval = null;
+
+// Pagination variables
+let currentPage = 1;
+const itemsPerPage = 5;
 
 // Initialize Dashboard
 document.addEventListener("DOMContentLoaded", () => {
@@ -60,7 +66,9 @@ document.addEventListener("DOMContentLoaded", () => {
     btnTrigger.addEventListener("click", triggerAgent);
     
     // Setup SMTP test
-    btnTestEmail.addEventListener("click", testSMTP);
+    if (btnTestEmail) {
+        btnTestEmail.addEventListener("click", testSMTP);
+    }
 });
 
 // Configure hosting environment (Firebase vs Localhost)
@@ -250,6 +258,25 @@ function togglePasswordVisibility(fieldId) {
     }
 }
 
+// Modal Control Functions
+function openConfigModal() {
+    const modal = document.getElementById("config-modal");
+    if (modal) {
+        modal.style.display = "flex";
+        fetchConfig(); // Reload settings when opening modal
+    }
+}
+
+function closeConfigModal() {
+    const modal = document.getElementById("config-modal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+window.openConfigModal = openConfigModal;
+window.closeConfigModal = closeConfigModal;
+
 // Fetch Configurations
 async function fetchConfig() {
     try {
@@ -274,11 +301,6 @@ async function saveConfig(e) {
     const configData = {
         MERCADO_LIVRE_AFFILIATE_ID: document.getElementById("MERCADO_LIVRE_AFFILIATE_ID").value,
         GEMINI_API_KEY: document.getElementById("GEMINI_API_KEY").value,
-        SMTP_SERVER: document.getElementById("SMTP_SERVER").value,
-        SMTP_PORT: parseInt(document.getElementById("SMTP_PORT").value) || 587,
-        SMTP_USER: document.getElementById("SMTP_USER").value,
-        SMTP_PASSWORD: document.getElementById("SMTP_PASSWORD").value,
-        RECEIVER_EMAIL: document.getElementById("RECEIVER_EMAIL").value,
         POST_TIMES: document.getElementById("POST_TIMES").value,
         ADMIN_PASSWORD: document.getElementById("ADMIN_PASSWORD").value
     };
@@ -298,6 +320,7 @@ async function saveConfig(e) {
         
         showToast(result.message, "success");
         fetchStatus();
+        closeConfigModal();
     } catch (error) {
         showToast("Falha ao salvar configurações: " + error.message, "error");
     }
@@ -353,6 +376,7 @@ async function fetchStatus() {
                 logRefreshInterval = null;
                 btnTrigger.disabled = false;
                 btnTrigger.innerHTML = `<i class="fa-solid fa-bolt"></i> Executar Agente Agora`;
+                currentPage = 1; // Reset to page 1 to see the new items!
                 fetchHistory(); // Refresh history list
             }
         }
@@ -412,17 +436,30 @@ async function triggerAgent() {
     }
 }
 
-// Test SMTP Server
+// Test SMTP Server (Deprecated)
 async function testSMTP() {
+    if (!btnTestEmail) return;
     btnTestEmail.disabled = true;
     btnTestEmail.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Testando...`;
     
+    const smtpServerEl = document.getElementById("SMTP_SERVER");
+    const smtpPortEl = document.getElementById("SMTP_PORT");
+    const smtpUserEl = document.getElementById("SMTP_USER");
+    const smtpPasswordEl = document.getElementById("SMTP_PASSWORD");
+    const receiverEmailEl = document.getElementById("RECEIVER_EMAIL");
+
+    if (!smtpServerEl || !smtpPortEl || !smtpUserEl || !smtpPasswordEl || !receiverEmailEl) {
+        btnTestEmail.disabled = false;
+        btnTestEmail.innerHTML = `<i class="fa-regular fa-paper-plane"></i> Testar Conexão SMTP`;
+        return;
+    }
+    
     const testData = {
-        SMTP_SERVER: document.getElementById("SMTP_SERVER").value,
-        SMTP_PORT: parseInt(document.getElementById("SMTP_PORT").value) || 587,
-        SMTP_USER: document.getElementById("SMTP_USER").value,
-        SMTP_PASSWORD: document.getElementById("SMTP_PASSWORD").value,
-        RECEIVER_EMAIL: document.getElementById("RECEIVER_EMAIL").value
+        SMTP_SERVER: smtpServerEl.value,
+        SMTP_PORT: parseInt(smtpPortEl.value) || 587,
+        SMTP_USER: smtpUserEl.value,
+        SMTP_PASSWORD: smtpPasswordEl.value,
+        RECEIVER_EMAIL: receiverEmailEl.value
     };
     
     try {
@@ -472,88 +509,181 @@ async function fetchHistory() {
         if (!response.ok) throw new Error("Falha ao carregar histórico");
         const history = await response.json();
         
-        if (history.length === 0) {
+        // Flatten all run items
+        let allItems = [];
+        history.forEach((run, runIndex) => {
+            run.items.forEach((item, itemIndex) => {
+                allItems.push({
+                    ...item,
+                    timestamp: run.timestamp,
+                    runIndex: runIndex,
+                    itemIndex: itemIndex
+                });
+            });
+        });
+        
+        if (allItems.length === 0) {
             historyContainer.innerHTML = `
                 <div class="empty-state">
                     <i class="fa-solid fa-box-open"></i>
                     <p>Nenhuma oferta gerada ainda. Execute o agente acima para iniciar!</p>
                 </div>`;
+            const controlsContainer = document.getElementById("pagination-controls");
+            if (controlsContainer) {
+                controlsContainer.innerHTML = "";
+                controlsContainer.style.display = "none";
+            }
             return;
         }
         
-        historyContainer.innerHTML = "";
-        
-        history.forEach((run, runIndex) => {
-            const runGroup = document.createElement("div");
-            runGroup.className = "run-group";
-            
-            // Header for group
-            const header = document.createElement("div");
-            header.className = "run-group-header";
-            header.innerHTML = `
-                <span><i class="fa-solid fa-calendar-day"></i> Envio em: ${run.timestamp}</span>
-                <span>${run.items.length} produto(s)</span>
-            `;
-            runGroup.appendChild(header);
-            
-            // Iterate run items
-            run.items.forEach((item, itemIndex) => {
-                const card = document.createElement("div");
-                card.className = "offer-card";
-                
-                const discountTag = item.discount ? `<span class="offer-discount-badge">${item.discount}</span>` : "";
-                const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
-                
-                card.innerHTML = `
-                    <div class="offer-product-info">
-                        <div class="offer-thumb-wrapper">
-                            <img src="${item.image_url}" class="offer-thumb" alt="Miniatura">
-                        </div>
-                        <div class="offer-details">
-                            <div class="offer-title">${item.title}</div>
-                            <div class="offer-price-row">
-                                ${originalPrice}
-                                <span class="offer-price-current">${item.price}</span>
-                                ${discountTag}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="offer-copy-section">
-                        <div class="copy-header-row">
-                            <span>Texto de Divulgação (WhatsApp):</span>
-                            <button class="btn-copy" onclick="copyToClipboard(this, ${runIndex}, ${itemIndex})">
-                                <i class="fa-regular fa-copy"></i> Copiar Texto
-                            </button>
-                        </div>
-                        <div class="offer-copy-box" id="copy-box-${runIndex}-${itemIndex}">${item.copy}</div>
-                    </div>
-                    
-                    <div class="offer-actions">
-                        <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')">
-                            <i class="fa-regular fa-image"></i> Copiar Imagem
-                        </button>
-                        <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy)}" class="btn-whatsapp" target="_blank">
-                            <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
-                        </a>
-                        <a href="${item.affiliate_link}" class="btn-link-ml" target="_blank">
-                            <i class="fa-solid fa-up-right-from-square"></i> Link de Afiliado
-                        </a>
-                    </div>
-                `;
-                runGroup.appendChild(card);
-            });
-            
-            historyContainer.appendChild(runGroup);
-        });
-        
         // Save history globally for clipboard access
         window.historyData = history;
+        
+        const totalItems = allItems.length;
+        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        
+        // Bounds checking
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+        
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+        const pageItems = allItems.slice(startIndex, endIndex);
+        
+        historyContainer.innerHTML = "";
+        
+        pageItems.forEach((item) => {
+            const card = document.createElement("div");
+            card.className = "offer-card";
+            card.style.border = "1px solid var(--border-color)";
+            card.style.borderRadius = "12px";
+            card.style.backgroundColor = "rgba(255, 255, 255, 0.01)";
+            card.style.marginBottom = "15px";
+            
+            const discountTag = item.discount ? `<span class="offer-discount-badge">${item.discount}</span>` : "";
+            const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
+            
+            card.innerHTML = `
+                <div class="offer-product-info">
+                    <div class="offer-thumb-wrapper">
+                        <img src="${item.image_url}" class="offer-thumb" alt="Miniatura">
+                    </div>
+                    <div class="offer-details">
+                        <div class="offer-title">${item.title}</div>
+                        <div class="offer-price-row">
+                            ${originalPrice}
+                            <span class="offer-price-current">${item.price}</span>
+                            ${discountTag}
+                        </div>
+                        <small style="color: var(--text-muted); margin-top: 5px; display: inline-flex; align-items: center; gap: 5px;">
+                            <i class="fa-solid fa-calendar-day"></i> Gerado em: ${item.timestamp}
+                        </small>
+                    </div>
+                </div>
+                
+                <div class="offer-copy-section">
+                    <div class="copy-header-row">
+                        <span>Texto de Divulgação (WhatsApp):</span>
+                        <button class="btn-copy" onclick="copyToClipboard(this, ${item.runIndex}, ${item.itemIndex})">
+                            <i class="fa-regular fa-copy"></i> Copiar Texto
+                        </button>
+                    </div>
+                    <div class="offer-copy-box" id="copy-box-${item.runIndex}-${item.itemIndex}">${item.copy}</div>
+                </div>
+                
+                <div class="offer-actions">
+                    <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')">
+                        <i class="fa-regular fa-image"></i> Copiar Imagem
+                    </button>
+                    <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy)}" class="btn-whatsapp" target="_blank">
+                        <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
+                    </a>
+                    <a href="${item.affiliate_link}" class="btn-link-ml" target="_blank">
+                        <i class="fa-solid fa-up-right-from-square"></i> Link de Afiliado
+                    </a>
+                </div>
+            `;
+            historyContainer.appendChild(card);
+        });
+        
+        renderPaginationControls(totalPages);
         
     } catch (error) {
         historyContainer.innerHTML = `<div class="empty-state"><p>Erro ao carregar histórico: ${error.message}</p></div>`;
     }
 }
+
+// Render pagination buttons
+function renderPaginationControls(totalPages) {
+    const controlsContainer = document.getElementById("pagination-controls");
+    if (!controlsContainer) return;
+    
+    if (totalPages <= 1) {
+        controlsContainer.innerHTML = "";
+        controlsContainer.style.display = "none";
+        return;
+    }
+    
+    controlsContainer.style.display = "flex";
+    controlsContainer.innerHTML = `
+        <button class="btn-page" id="btn-page-prev" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">
+            <i class="fa-solid fa-chevron-left"></i> Anterior
+        </button>
+        <span class="page-info">Página ${currentPage} de ${totalPages}</span>
+        <button class="btn-page" id="btn-page-next" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">
+            Próxima <i class="fa-solid fa-chevron-right"></i>
+        </button>
+    `;
+}
+
+// Action to navigate between pages
+function changePage(page) {
+    currentPage = page;
+    fetchHistory();
+    // Scroll layout to top of history container smoothly
+    const historyHeader = document.querySelector(".panel-history");
+    if (historyHeader) {
+        historyHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+window.changePage = changePage;
+
+// PWA Installation Logic & Service Worker Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(reg => console.log('Service Worker registrado com sucesso!', reg))
+            .catch(err => console.log('Erro ao registrar o Service Worker:', err));
+    });
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (btnInstallApp) {
+        btnInstallApp.style.display = "inline-flex";
+    }
+});
+
+if (btnInstallApp) {
+    btnInstallApp.addEventListener("click", async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User choice outcome: ${outcome}`);
+        deferredPrompt = null;
+        btnInstallApp.style.display = "none";
+    });
+}
+
+window.addEventListener("appinstalled", () => {
+    deferredPrompt = null;
+    if (btnInstallApp) {
+        btnInstallApp.style.display = "none";
+    }
+    showToast("Aplicativo instalado com sucesso!", "success");
+});
 
 // Copy to Clipboard Action
 function copyToClipboard(button, runIndex, itemIndex) {

@@ -20,11 +20,6 @@ class Config:
         return {
             "MERCADO_LIVRE_AFFILIATE_ID": os.getenv("MERCADO_LIVRE_AFFILIATE_ID", ""),
             "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", ""),
-            "SMTP_SERVER": os.getenv("SMTP_SERVER", "smtp.gmail.com"),
-            "SMTP_PORT": int(os.getenv("SMTP_PORT", "587")),
-            "SMTP_USER": os.getenv("SMTP_USER", ""),
-            "SMTP_PASSWORD": os.getenv("SMTP_PASSWORD", ""),
-            "RECEIVER_EMAIL": os.getenv("RECEIVER_EMAIL", ""),
             "POST_TIMES": os.getenv("POST_TIMES", "09:00,12:30,19:00"),
             "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "admin"),
         }

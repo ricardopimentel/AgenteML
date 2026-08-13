@@ -266,22 +266,13 @@ body {
 
 /* CONTENT LAYOUT */
 .app-content {
-    display: grid;
-    grid-template-columns: 1fr 1.3fr;
-    gap: 24px;
-    flex: 1;
-}
-
-@media (max-width: 968px) {
-    .app-content {
-        grid-template-columns: 1fr;
-    }
-}
-
-.right-column {
     display: flex;
     flex-direction: column;
     gap: 24px;
+    flex: 1;
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
 }
 
 /* PANEL STYLES */
@@ -858,14 +849,146 @@ small {
 .toast i.error { color: var(--danger-color); }
 .toast i.info { color: var(--info-color); }
 
-/* Desktop Sticky Config Panel */
-@media (min-width: 969px) {
-    .panel-config {
-        position: sticky;
-        top: 20px;
-        align-self: start;
-        max-height: calc(100vh - 40px);
-        overflow-y: auto;
-        padding-right: 5px;
-    }
+/* CONFIGURATION MODAL STYLES */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(9, 11, 15, 0.75);
+    backdrop-filter: blur(10px);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    animation: fadeIn 0.3s ease;
+}
+
+.modal-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+    animation: scaleIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scaleIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.modal-header h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-header h2 i {
+    color: var(--accent-color);
+}
+
+.btn-close-modal {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+    transition: color var(--transition-speed);
+}
+
+.btn-close-modal:hover {
+    color: var(--danger-color);
+}
+
+.modal-body {
+    padding: 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+/* FLOATING ACTION BUTTON (FAB) */
+.btn-fab {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--accent-gradient);
+    border: none;
+    color: #111;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(255, 215, 0, 0.4);
+    transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+    z-index: 990; /* below toast/login but above dashboard panels */
+}
+
+.btn-fab:hover {
+    transform: scale(1.1) rotate(45deg);
+    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.6);
+}
+
+/* PAGINATION CONTROLS */
+.pagination-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    padding: 15px 24px;
+    border-top: 1px solid var(--border-color);
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.btn-page {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+}
+
+.btn-page:hover:not(:disabled) {
+    background-color: var(--accent-color);
+    color: #111;
+    border-color: var(--accent-color);
+}
+
+.btn-page:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.page-info {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-weight: 500;
 }
