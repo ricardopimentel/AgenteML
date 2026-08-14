@@ -1,4 +1,4 @@
-const CACHE_NAME = 'agenteml-cache-v1';
+const CACHE_NAME = 'agenteml-cache-v4';
 const ASSETS = [
   '/',
   '/index.html',

@@ -22,6 +22,9 @@ class Config:
             "GEMINI_API_KEY": os.getenv("GEMINI_API_KEY", ""),
             "POST_TIMES": os.getenv("POST_TIMES", "09:00,12:30,19:00"),
             "ADMIN_PASSWORD": os.getenv("ADMIN_PASSWORD", "admin"),
+            "ML_AFFILIATE_COOKIE": os.getenv("ML_AFFILIATE_COOKIE", ""),
+            "ML_AFFILIATE_CSRF_TOKEN": os.getenv("ML_AFFILIATE_CSRF_TOKEN", ""),
+            "ML_AFFILIATE_TAG": os.getenv("ML_AFFILIATE_TAG", "shopp-ml2010"),
         }
 
     @staticmethod

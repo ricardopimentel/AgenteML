@@ -1,6 +1,6 @@
 import requests
 
-url = "https://meli.la/18iM94t"
+url = "https://meli.la/2AN9B2g"
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
 }

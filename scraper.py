@@ -3,6 +3,59 @@ from bs4 import BeautifulSoup
 import re
 import urllib.parse
 from config import Config
+import os
+
+def shorten_url_via_ml_api(product_id, original_url, cookie, csrf_token, tag="shopp-ml2010"):
+    import requests
+    target_url = "https://www.mercadolivre.com.br/affiliate-program/api/v2/affiliates/createLink"
+    headers = {
+        "Content-Type": "application/json",
+        "Cookie": cookie,
+        "X-Csrf-Token": csrf_token,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Origin": "https://www.mercadolivre.com.br",
+        "Referer": "https://www.mercadolivre.com.br/social/afiliados/links"
+    }
+    payload = {
+        "itemId": product_id,
+        "itemAddToList": product_id,
+        "tag": tag,
+        "type": "user_product",
+        "buyBoxWinner": product_id,
+        "extraCommission": "true",
+        "urls": [original_url]
+    }
+    try:
+        r = requests.post(target_url, headers=headers, json=payload, timeout=10)
+        
+        # If session is expired or unauthorized
+        if r.status_code in [401, 403]:
+            raise ValueError("Sessão do Mercado Livre expirou ou é inválida. Atualize os cookies e o CSRF token nas configurações.")
+            
+        if r.status_code == 200:
+            res_data = r.json()
+            
+            # Check if there is a product-specific error (not allowed in affiliates)
+            urls_info = res_data.get("urls", [])
+            if urls_info and isinstance(urls_info, list) and isinstance(urls_info[0], dict):
+                error_msg = urls_info[0].get("message")
+                error_code = urls_info[0].get("error_code")
+                if error_code or (error_msg and "not allowed" in error_msg.lower()):
+                    print(f"Product {product_id} is not allowed in affiliates program: {error_msg}")
+                    return None
+                    
+            short_url = res_data.get("short_url")
+            if not short_url and urls_info and isinstance(urls_info, list) and isinstance(urls_info[0], dict):
+                short_url = urls_info[0].get("short_url")
+            return short_url
+        else:
+            print(f"Error calling shortener API in scraper. Status: {r.status_code}, Response: {r.text}")
+    except ValueError as ve:
+        raise ve
+    except Exception as e:
+        print(f"Error calling shortener API in scraper: {e}")
+    return None
 
 def scrape_mercado_livre_deals(limit=10, randomize=True):
     import random
@@ -21,6 +74,12 @@ def scrape_mercado_livre_deals(limit=10, randomize=True):
     
     settings = Config.get_all()
     affiliate_id = settings.get("MERCADO_LIVRE_AFFILIATE_ID", "")
+    cookie = settings.get("ML_AFFILIATE_COOKIE", "")
+    csrf_token = settings.get("ML_AFFILIATE_CSRF_TOKEN", "")
+    tag = settings.get("ML_AFFILIATE_TAG", "shopp-ml2010")
+    
+    if not cookie or not csrf_token:
+        raise ValueError("Sessão do Mercado Livre (Proxy) não configurada no .env. Atualize os cookies nas configurações do painel.")
     
     for page in pages_to_try:
         url = f"https://www.mercadolivre.com.br/ofertas?page={page}" if page > 1 else "https://www.mercadolivre.com.br/ofertas"
@@ -43,19 +102,19 @@ def scrape_mercado_livre_deals(limit=10, randomize=True):
                 if not original_link:
                     continue
                     
-                # Clean original link (remove existing queries)
+                # Clean original link (remove query parameters for cleaner copying)
                 parsed_url = urllib.parse.urlparse(original_link)
                 clean_link = f"{parsed_url.scheme}://{parsed_url.netloc}{parsed_url.path}"
                 
-                # Construct affiliate link
-                if affiliate_id:
-                    affiliate_link = f"{clean_link}?affiliate={affiliate_id}"
-                else:
-                    affiliate_link = clean_link
-                    
-                # Extract MLB ID
+                # Extract MLB ID for internal tracking (if needed)
                 mlb_match = re.search(r"MLB-?\d+", clean_link)
                 mlb_id = mlb_match.group(0).replace("-", "") if mlb_match else "unknown"
+                
+                # Use the clean original scraped link to ensure the URL always opens correctly
+                short_link = clean_link
+                    
+                # We no longer generate affiliate links automatically as per user request
+                affiliate_link = ""
                 
                 # 2. Image URL
                 img_el = card.find("img", class_="poly-component__picture")
@@ -93,7 +152,7 @@ def scrape_mercado_livre_deals(limit=10, randomize=True):
                     deals.append({
                         "id": mlb_id,
                         "title": title,
-                        "original_link": original_link,
+                        "original_link": short_link,  # Clean short_link for easy user copy
                         "affiliate_link": affiliate_link,
                         "price": price_str,
                         "original_price": original_price,
@@ -106,6 +165,8 @@ def scrape_mercado_livre_deals(limit=10, randomize=True):
                     random.shuffle(deals)
                 return deals[:limit]
                 
+        except ValueError as ve:
+            raise ve
         except Exception as e:
             print(f"Scraper page {page} exception: {e}")
             continue

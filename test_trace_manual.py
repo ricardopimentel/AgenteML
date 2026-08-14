@@ -1,12 +1,12 @@
 import requests
 
-url = "https://meli.la/18iM94t"
+url = "https://meli.la/1HCPkzk"
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
 }
 
 try:
-    print(f"Tracing redirects for {url}...")
+    print(f"Tracing redirects for manual link {url}...")
     r = requests.get(url, headers=headers, allow_redirects=True)
     print(f"Final URL: {r.url}")
     print(f"History of redirects:")

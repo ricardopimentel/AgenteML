@@ -223,6 +223,26 @@
                     </div>
                 </div>
 
+                <!-- Mercado Livre Session Section -->
+                <div class="form-section">
+                    <h3><i class="fa-solid fa-cookie-bite"></i> Sessão Mercado Livre (Proxy)</h3>
+                    <div class="form-group">
+                        <label for="ML_AFFILIATE_COOKIE">Cookie de Sessão (PWA)</label>
+                        <textarea id="ML_AFFILIATE_COOKIE" rows="3" placeholder="Cole o cookie completo de sessão do Mercado Livre aqui..."></textarea>
+                        <small>Necessário para gerar links curtos rastreáveis automaticamente.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="ML_AFFILIATE_CSRF_TOKEN">Token CSRF (X-Csrf-Token)</label>
+                        <input type="text" id="ML_AFFILIATE_CSRF_TOKEN" placeholder="Insira o valor do x-csrf-token">
+                        <small>Necessário para autorizar as requisições de geração de links.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="ML_AFFILIATE_TAG">Tag / Canal de Divulgação (Tag/Nick)</label>
+                        <input type="text" id="ML_AFFILIATE_TAG" placeholder="Ex: shopp-ml2010" required>
+                        <small>O identificador do Canal configurado no seu portal de afiliado.</small>
+                    </div>
+                </div>
+
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary btn-block">
                         <i class="fa-regular fa-floppy-disk"></i> Salvar Configurações

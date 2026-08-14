@@ -1103,3 +1103,45 @@ small {
         border-radius: 12px;
     }
 }
+
+/* Custom Styles for Manual Affiliate Link Workflow */
+.btn-copy-original {
+    background-color: rgba(255, 215, 0, 0.05);
+    color: var(--accent-color);
+    border: 1px solid rgba(255, 215, 0, 0.15);
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-speed);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-copy-original:hover {
+    background-color: var(--accent-color);
+    color: #111;
+}
+.btn-copy-original.copied {
+    background-color: var(--success-bg);
+    color: var(--success-color);
+    border-color: var(--success-color);
+}
+
+button[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed !important;
+    pointer-events: none;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-muted) !important;
+}
+
+.btn-whatsapp.disabled-btn {
+    opacity: 0.4;
+    cursor: not-allowed !important;
+    pointer-events: none;
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-muted) !important;
+}

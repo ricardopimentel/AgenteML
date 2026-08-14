@@ -302,7 +302,10 @@ async function saveConfig(e) {
         MERCADO_LIVRE_AFFILIATE_ID: document.getElementById("MERCADO_LIVRE_AFFILIATE_ID").value,
         GEMINI_API_KEY: document.getElementById("GEMINI_API_KEY").value,
         POST_TIMES: document.getElementById("POST_TIMES").value,
-        ADMIN_PASSWORD: document.getElementById("ADMIN_PASSWORD").value
+        ADMIN_PASSWORD: document.getElementById("ADMIN_PASSWORD").value,
+        ML_AFFILIATE_COOKIE: document.getElementById("ML_AFFILIATE_COOKIE").value,
+        ML_AFFILIATE_CSRF_TOKEN: document.getElementById("ML_AFFILIATE_CSRF_TOKEN").value,
+        ML_AFFILIATE_TAG: document.getElementById("ML_AFFILIATE_TAG").value
     };
     
     try {
@@ -563,6 +566,10 @@ async function fetchHistory() {
             const discountTag = item.discount ? `<span class="offer-discount-badge">${item.discount}</span>` : "";
             const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
             
+            const hasLink = !!item.affiliate_link;
+            const copyPreview = item.copy.replace("[LINK_AFILIADO]", item.affiliate_link || "[COLE O LINK DE AFILIADO PARA ATIVAR]");
+            const whatsappUrl = hasLink ? `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy.replace("[LINK_AFILIADO]", item.affiliate_link))}` : "#";
+            
             card.innerHTML = `
                 <div class="offer-product-info">
                     <div class="offer-thumb-wrapper">
@@ -581,25 +588,44 @@ async function fetchHistory() {
                     </div>
                 </div>
                 
+                <div class="manual-link-builder-row" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; margin: 10px 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">1. Gere o link de afiliado oficial do ML:</span>
+                        <button class="btn-copy-original" onclick="copyOriginalLink(this, '${item.original_link}')">
+                            <i class="fa-regular fa-copy"></i> Copiar Link do Produto
+                        </button>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center; width: 100%; margin-top: 5px;">
+                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); min-width: 140px;">2. Cole o link curto gerado:</span>
+                        <input type="text" 
+                               placeholder="meli.la/XXXX" 
+                               value="${item.affiliate_link || ''}" 
+                               style="flex-grow: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.85rem;" />
+                        <button class="btn-copy" onclick="saveAffiliateLink(this, '${item.timestamp}', '${item.title.replace(/'/g, "\\'")}')">
+                            Salvar Link
+                        </button>
+                    </div>
+                </div>
+                
                 <div class="offer-copy-section">
                     <div class="copy-header-row">
                         <span>Texto de Divulgação (WhatsApp):</span>
-                        <button class="btn-copy" onclick="copyToClipboard(this, ${item.runIndex}, ${item.itemIndex})">
+                        <button class="btn-copy" ${!hasLink ? 'disabled' : ''} onclick="copyToClipboard(this, ${item.runIndex}, ${item.itemIndex})">
                             <i class="fa-regular fa-copy"></i> Copiar Texto
                         </button>
                     </div>
-                    <div class="offer-copy-box" id="copy-box-${item.runIndex}-${item.itemIndex}">${item.copy}</div>
+                    <div class="offer-copy-box" id="copy-box-${item.runIndex}-${item.itemIndex}">${copyPreview}</div>
                 </div>
                 
                 <div class="offer-actions">
                     <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')">
                         <i class="fa-regular fa-image"></i> Copiar Imagem
                     </button>
-                    <a href="https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy)}" class="btn-whatsapp" target="_blank">
+                    <a href="${whatsappUrl}" 
+                       class="btn-whatsapp ${!hasLink ? 'disabled-btn' : ''}" 
+                       ${!hasLink ? 'onclick="return false;"' : ''}
+                       target="_blank">
                         <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
-                    </a>
-                    <a href="${item.affiliate_link}" class="btn-link-ml" target="_blank">
-                        <i class="fa-solid fa-up-right-from-square"></i> Link de Afiliado
                     </a>
                 </div>
             `;
@@ -690,7 +716,8 @@ function copyToClipboard(button, runIndex, itemIndex) {
     if (!window.historyData) return;
     
     try {
-        const text = window.historyData[runIndex].items[itemIndex].copy;
+        const item = window.historyData[runIndex].items[itemIndex];
+        const text = item.copy.replace("[LINK_AFILIADO]", item.affiliate_link || "");
         
         navigator.clipboard.writeText(text).then(() => {
             const originalHTML = button.innerHTML;
@@ -771,3 +798,60 @@ async function copyImageToClipboard(button, imageUrl) {
         button.disabled = false;
     }
 }
+
+// Copy original product link to clipboard
+function copyOriginalLink(button, url) {
+    navigator.clipboard.writeText(url).then(() => {
+        const originalHTML = button.innerHTML;
+        button.className = "btn-copy-original copied";
+        button.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+        
+        setTimeout(() => {
+            button.className = "btn-copy-original";
+            button.innerHTML = originalHTML;
+        }, 2000);
+    }).catch(err => {
+        showToast("Erro ao copiar link: " + err.message, "error");
+    });
+}
+window.copyOriginalLink = copyOriginalLink;
+
+// Save manual affiliate link to history.json
+async function saveAffiliateLink(button, timestamp, title) {
+    const card = button.closest(".offer-card");
+    const input = card.querySelector(".manual-link-builder-row input");
+    const linkValue = input.value.trim();
+    
+    if (!linkValue) {
+        showToast("Por favor, insira o link de afiliado antes de salvar.", "error");
+        return;
+    }
+    
+    button.disabled = true;
+    button.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i>...`;
+    
+    try {
+        const response = await request(getApiUrl("/api/update-affiliate-link"), {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                timestamp: timestamp,
+                title: title,
+                affiliate_link: linkValue
+            })
+        });
+        
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Erro desconhecido");
+        
+        showToast("Link salvo com sucesso!", "success");
+        fetchHistory(); // Refresh to update button states and texts
+        
+    } catch (error) {
+        showToast("Erro ao salvar link: " + error.message, "error");
+    } finally {
+        button.disabled = false;
+        button.innerHTML = "Salvar Link";
+    }
+}
+window.saveAffiliateLink = saveAffiliateLink;

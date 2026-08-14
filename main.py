@@ -22,6 +22,18 @@ class ConfigSchema(BaseModel):
     GEMINI_API_KEY: str
     POST_TIMES: str
     ADMIN_PASSWORD: str
+    ML_AFFILIATE_COOKIE: str
+    ML_AFFILIATE_CSRF_TOKEN: str
+    ML_AFFILIATE_TAG: str
+
+class ShortLinkSchema(BaseModel):
+    productId: str
+    originalUrl: str
+
+class UpdateLinkSchema(BaseModel):
+    timestamp: str
+    title: str
+    affiliate_link: str
 
 class LoginSchema(BaseModel):
     password: str
@@ -81,6 +93,84 @@ def trigger_agent(background_tasks: BackgroundTasks):
     return {"status": "success", "message": "Fluxo do agente disparado em segundo plano!"}
 
 
+@app.post("/api/shorten-link", dependencies=[Depends(verify_auth)])
+def shorten_link(data: ShortLinkSchema):
+    import requests
+    # Retrieve cookie and token from env
+    cookie = os.getenv("ML_AFFILIATE_COOKIE", "")
+    csrf_token = os.getenv("ML_AFFILIATE_CSRF_TOKEN", "")
+    
+    if not cookie or not csrf_token:
+        raise HTTPException(
+            status_code=400,
+            detail="Credenciais PWA do Mercado Livre ausentes no arquivo .env (ML_AFFILIATE_COOKIE e ML_AFFILIATE_CSRF_TOKEN)."
+        )
+        
+    target_url = "https://www.mercadolivre.com.br/affiliate-program/api/v2/affiliates/createLink"
+    
+    headers = {
+        "Content-Type": "application/json",
+        "Cookie": cookie,
+        "X-Csrf-Token": csrf_token,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "Accept": "application/json",
+        "Origin": "https://www.mercadolivre.com.br",
+        "Referer": "https://www.mercadolivre.com.br/social/afiliados/links"
+    }
+    
+    tag = os.getenv("ML_AFFILIATE_TAG", "shopp-ml2010")
+    payload = {
+        "itemId": data.productId,
+        "itemAddToList": data.productId,
+        "tag": tag,
+        "type": "user_product",
+        "buyBoxWinner": data.productId,
+        "extraCommission": "true",
+        "urls": [data.originalUrl]
+    }
+    
+    try:
+        response = requests.post(target_url, headers=headers, json=payload, timeout=15)
+        
+        if response.status_code in [401, 403]:
+            raise HTTPException(
+                status_code=401,
+                detail="Sessão expirada - Atualize os cookies no .env"
+            )
+            
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Erro do Mercado Livre (Status {response.status_code}): {response.text}"
+            )
+            
+        res_data = response.json()
+        short_url = res_data.get("short_url")
+        
+        if not short_url:
+            # Fallback check if structure is nested
+            if isinstance(res_data, list) and len(res_data) > 0:
+                short_url = res_data[0].get("short_url")
+            elif isinstance(res_data, dict) and "urls" in res_data:
+                urls = res_data.get("urls", [])
+                if urls and isinstance(urls, list) and isinstance(urls[0], dict):
+                    short_url = urls[0].get("short_url")
+                    
+        if not short_url:
+            raise HTTPException(
+                status_code=522,
+                detail=f"Resposta recebida sem short_url: {res_data}"
+            )
+            
+        return {"status": "success", "short_url": short_url}
+        
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Falha de rede ao conectar com Mercado Livre: {str(e)}"
+        )
+
+
 @app.get("/api/proxy-image")
 def proxy_image(url: str):
     import requests
@@ -94,6 +184,31 @@ def proxy_image(url: str):
         raise HTTPException(status_code=r.status_code, detail="Failed to fetch image from source")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/update-affiliate-link")
+def update_affiliate_link(data: UpdateLinkSchema):
+    import json
+    history = scheduler.load_history()
+    updated = False
+    for entry in history:
+        if entry.get("timestamp") == data.timestamp:
+            for item in entry.get("items", []):
+                if item.get("title") == data.title:
+                    item["affiliate_link"] = data.affiliate_link
+                    updated = True
+                    break
+            if updated:
+                break
+                
+    if not updated:
+        raise HTTPException(status_code=404, detail="Produto não encontrado no histórico.")
+        
+    try:
+        with open(scheduler.HISTORY_PATH, "w", encoding="utf-8") as f:
+            json.dump(history, f, indent=4, ensure_ascii=False)
+        return {"status": "success", "message": "Link de afiliado atualizado!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao salvar histórico: {str(e)}")
 
 # Mount static files from renamed directory "public".
 public_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "public")
