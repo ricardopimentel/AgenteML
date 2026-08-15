@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "AgenteML Helper",
+  "version": "1.0.0",
+  "description": "Gere anúncios de afiliados com IA no painel AgenteML a partir do seu navegador.",
+  "permissions": [
+    "activeTab",
+    "tabs"
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

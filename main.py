@@ -103,18 +103,29 @@ def generate_custom_offer(data: CustomOfferSchema):
 
     url = data.url.strip()
     if not url:
-        raise HTTPException(status_code=400, detail="Por favor, forneça uma URL de produto válida.")
+        raise HTTPException(status_code=400, detail="Por favor, forneça uma URL válida.")
         
-    parsed = urllib.parse.urlparse(url)
+    # 1. Resolve redirect to get final URL
+    resolved_url = url
+    try:
+        # Use GET directly since meli.la returns 405 Method Not Allowed on HEAD requests
+        r_resolve = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, allow_redirects=True, timeout=10)
+        resolved_url = r_resolve.url
+    except Exception:
+        pass
+        
+    parsed = urllib.parse.urlparse(resolved_url)
     if "mercadolivre.com.br" not in parsed.netloc and "mercadolibre.com" not in parsed.netloc:
         raise HTTPException(status_code=400, detail="A URL fornecida não é do Mercado Livre.")
         
+    is_social = "/social/" in parsed.path
     prefix = "www"
     if "produto" in parsed.netloc:
         prefix = "produto"
         
     mirror_domain = f"{prefix}-mercadolivre-com-br.translate.goog"
-    mirror_url = f"https://{mirror_domain}{parsed.path}?_x_tr_sl=auto&_x_tr_tl=pt&_x_tr_hl=pt-BR"
+    # Keep query parameters for social pages so highlight details load correctly
+    mirror_url = f"https://{mirror_domain}{parsed.path}?{parsed.query}&_x_tr_sl=auto&_x_tr_tl=pt&_x_tr_hl=pt-BR"
     
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
@@ -128,52 +139,85 @@ def generate_custom_offer(data: CustomOfferSchema):
             
         soup = BeautifulSoup(response.text, "html.parser")
         
-        # 1. Title Extraction
-        title_meta = soup.find("meta", property="og:title")
-        title = title_meta.get("content") if title_meta else None
-        if not title:
-            title_h1 = soup.find("h1")
-            title = title_h1.text.strip() if title_h1 else "Produto Mercado Livre"
-            
-        if " - Google Tradutor" in title:
-            title = title.replace(" - Google Tradutor", "")
-            
-        # 2. Image Extraction
-        image_meta = soup.find("meta", property="og:image")
-        image_url = image_meta.get("content") if image_meta else ""
-        if not image_url:
-            img_el = soup.find("img", class_="ui-pdp-image") or soup.find("img", class_="ui-pdp-gallery__figure__image")
-            image_url = img_el.get("src") if img_el else ""
-            
-        # 3. Price & Discount Extraction
-        price_meta = soup.find("meta", itemprop="price")
-        price_val = price_meta.get("content") if price_meta else None
-        
-        if price_val:
-            try:
-                price_float = float(price_val)
-                if price_float.is_integer():
-                    price_str = f"R${int(price_float)}"
-                else:
-                    price_str = f"R${price_float:.2f}".replace(".", ",")
-            except Exception:
-                price_str = f"R${price_val}"
-        else:
-            price_fraction_el = soup.select_one(".ui-pdp-price__second-line .andes-money-amount__fraction") or soup.find(class_="andes-money-amount__fraction")
-            price_str = f"R${price_fraction_el.text.strip()}" if price_fraction_el else "Sob Consulta"
-            
-        prev_el = soup.find(class_="andes-money-amount--previous")
-        original_price = ""
-        if prev_el:
-            prev_fraction = prev_el.find(class_="andes-money-amount__fraction")
-            if prev_fraction:
-                original_price = f"R${prev_fraction.text.strip()}"
+        if is_social:
+            card = soup.find(class_="poly-card")
+            if not card:
+                raise HTTPException(status_code=404, detail="Não foi possível identificar o produto destacado na página social.")
                 
-        disc_el = soup.find(class_="andes-money-amount__discount")
-        discount = ""
-        if disc_el:
-            discount = disc_el.text.strip()
+            # 1. Title Extraction
+            title_el = card.find(class_="poly-component__title")
+            title = title_el.text.strip() if title_el else "Produto Mercado Livre"
+            if " - Google Tradutor" in title:
+                title = title.replace(" - Google Tradutor", "")
+                
+            # 2. Image Extraction
+            img_el = card.find("img", class_="poly-component__picture")
+            image_url = ""
+            if img_el:
+                image_url = img_el.get("data-src") or img_el.get("src") or ""
+                
+            # 3. Price & Discount Extraction
+            prev_el = card.find(class_="andes-money-amount--previous")
+            original_price = prev_el.text.strip() if prev_el else ""
             
+            # Filter current price
+            money_elements = card.find_all(class_="andes-money-amount")
+            price_str = "Sob Consulta"
+            for el in money_elements:
+                if "andes-money-amount--previous" not in el.get("class", []):
+                    price_str = el.text.strip()
+                    break
+                    
+            disc_el = card.find(class_="andes-money-amount__discount")
+            discount = disc_el.text.strip() if disc_el else ""
+        else:
+            # 1. Title Extraction
+            title_meta = soup.find("meta", property="og:title")
+            title = title_meta.get("content") if title_meta else None
+            if not title:
+                title_h1 = soup.find("h1")
+                title = title_h1.text.strip() if title_h1 else "Produto Mercado Livre"
+                
+            if " - Google Tradutor" in title:
+                title = title.replace(" - Google Tradutor", "")
+                
+            # 2. Image Extraction
+            image_meta = soup.find("meta", property="og:image")
+            image_url = image_meta.get("content") if image_meta else ""
+            if not image_url:
+                img_el = soup.find("img", class_="ui-pdp-image") or soup.find("img", class_="ui-pdp-gallery__figure__image")
+                image_url = img_el.get("src") if img_el else ""
+                
+            # 3. Price & Discount Extraction
+            price_meta = soup.find("meta", itemprop="price")
+            price_val = price_meta.get("content") if price_meta else None
+            
+            if price_val:
+                try:
+                    price_float = float(price_val)
+                    if price_float.is_integer():
+                        price_str = f"R${int(price_float)}"
+                    else:
+                        price_str = f"R${price_float:.2f}".replace(".", ",")
+                except Exception:
+                    price_str = f"R${price_val}"
+            else:
+                price_fraction_el = soup.select_one(".ui-pdp-price__second-line .andes-money-amount__fraction") or soup.find(class_="andes-money-amount__fraction")
+                price_str = f"R${price_fraction_el.text.strip()}" if price_fraction_el else "Sob Consulta"
+                
+            prev_el = soup.find(class_="andes-money-amount--previous")
+            original_price = ""
+            if prev_el:
+                prev_fraction = prev_el.find(class_="andes-money-amount__fraction")
+                if prev_fraction:
+                    original_price = f"R${prev_fraction.text.strip()}"
+                    
+            disc_el = soup.find(class_="andes-money-amount__discount")
+            discount = ""
+            if disc_el:
+                discount = disc_el.text.strip()
+            
+        # Common discount calculation fallback
         if not discount and original_price and price_str != "Sob Consulta":
             try:
                 orig_num = float(re.sub(r"[^\d,]", "", original_price).replace(",", "."))
@@ -184,14 +228,13 @@ def generate_custom_offer(data: CustomOfferSchema):
             except Exception:
                 pass
                 
-        clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-        
+        # 4. Generate AI Copy with URL already populated!
         copy = ai_copywriter.generate_whatsapp_copy(
             title=title,
             price=price_str,
             original_price=original_price,
             discount=discount or "Promoção",
-            link="[LINK_AFILIADO]"
+            link=url  # Populate the input affiliate link directly!
         )
         
         return {
@@ -201,9 +244,10 @@ def generate_custom_offer(data: CustomOfferSchema):
                 "price": price_str,
                 "original_price": original_price,
                 "discount": discount or "Promoção",
-                "original_link": clean_url,
+                "original_link": resolved_url,
                 "image_url": image_url,
-                "copy": copy
+                "copy": copy,
+                "affiliate_link": url
             }
         }
         

@@ -116,12 +116,12 @@
                     </div>
                     <div class="panel-body">
                         <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.90rem;">
-                            Insira a URL de qualquer produto do Mercado Livre abaixo. O sistema extrairá a imagem, título, preços e desconto para criar um anúncio de vendas altamente persuasivo com a inteligência artificial do Gemini.
+                            Insira seu <strong>link curto de afiliado</strong> (ex: <code>meli.la/...</code>) ou seu <strong>link de afiliado longo</strong> direto do Mercado Livre. O sistema irá decodificar o link de destino automaticamente, buscar o produto e gerar o anúncio de vendas com o seu link de afiliado inserido na copy!
                         </p>
                         <form id="custom-offer-form" style="display: flex; flex-direction: column; gap: 15px;">
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label for="custom-product-url">Link do Produto Mercado Livre</label>
-                                <input type="url" id="custom-product-url" placeholder="https://produto.mercadolivre.com.br/MLB-XXXX..." required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.90rem;" />
+                                <label for="custom-product-url">Link de Afiliado do Produto (meli.la ou completo)</label>
+                                <input type="url" id="custom-product-url" placeholder="https://meli.la/XXXX ou link de afiliado do Mercado Livre..." required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.90rem;" />
                             </div>
                             <button type="submit" id="btn-generate-custom" class="btn btn-gradient" style="align-self: flex-start; padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px;">
                                 <i class="fa-solid fa-magic"></i> Gerar Anúncio com IA

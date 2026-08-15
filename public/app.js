@@ -187,6 +187,29 @@ function showApp() {
     
     // Start ticking clock
     startTickingClock();
+
+    // Check for query parameters (e.g. from Chrome extension)
+    const urlParams = new URLSearchParams(window.location.search);
+    const affiliateLink = urlParams.get('affiliate_link');
+    if (affiliateLink) {
+        const urlInput = document.getElementById("custom-product-url");
+        if (urlInput) {
+            urlInput.value = affiliateLink;
+            
+            // Switch to correct tab
+            switchTab('gerador-individual');
+            
+            // Wait slightly for DOM to settle and trigger submit
+            setTimeout(() => {
+                const customOfferForm = document.getElementById("custom-offer-form");
+                if (customOfferForm) {
+                    customOfferForm.dispatchEvent(new Event('submit'));
+                }
+            }, 100);
+        }
+        // Clean URL query params without reloading the page
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
 }
 
 // Logout action
@@ -926,9 +949,7 @@ function renderCustomPreview(item) {
 
     const discountTag = item.discount ? `<span class="offer-discount-badge">${item.discount}</span>` : "";
     const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
-    const hasLink = !!item.affiliate_link;
-    const copyPreview = item.copy.replace("[LINK_AFILIADO]", item.affiliate_link || "[COLE O SEU LINK DE AFILIADO MANUALMENTE PARA ATIVAR]");
-    const whatsappUrl = hasLink ? `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy.replace("[LINK_AFILIADO]", item.affiliate_link))}` : "#";
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy)}`;
 
     customPreviewCard.innerHTML = `
         <div class="offer-product-info">
@@ -945,26 +966,14 @@ function renderCustomPreview(item) {
             </div>
         </div>
         
-        <div class="manual-link-builder-row" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; margin: 10px 0;">
-            <div style="display: flex; gap: 10px; align-items: center; width: 100%; flex-wrap: wrap;">
-                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); min-width: 160px;">Cole seu link de afiliado:</span>
-                <input type="text" 
-                       id="custom-affiliate-input"
-                       placeholder="meli.la/XXXX" 
-                       value="${item.affiliate_link || ''}" 
-                       oninput="updateCustomAffiliateLink(this)"
-                       style="flex-grow: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.85rem;" />
-            </div>
-        </div>
-        
-        <div class="offer-copy-section">
+        <div class="offer-copy-section" style="margin-top: 15px;">
             <div class="copy-header-row">
                 <span>Texto de Divulgação (WhatsApp):</span>
-                <button class="btn-copy" id="btn-copy-custom" ${!hasLink ? 'disabled' : ''} onclick="copyCustomToClipboard(this)">
+                <button class="btn-copy" id="btn-copy-custom" onclick="copyCustomToClipboard(this)">
                     <i class="fa-regular fa-copy"></i> Copiar Texto
                 </button>
             </div>
-            <div class="offer-copy-box" id="copy-box-custom">${copyPreview}</div>
+            <div class="offer-copy-box" id="copy-box-custom">${item.copy}</div>
         </div>
         
         <div class="offer-actions">
@@ -973,8 +982,7 @@ function renderCustomPreview(item) {
             </button>
             <a href="${whatsappUrl}" 
                id="btn-whatsapp-custom"
-               class="btn-whatsapp ${!hasLink ? 'disabled-btn' : ''}" 
-               ${!hasLink ? 'onclick="return false;"' : ''}
+               class="btn-whatsapp" 
                target="_blank">
                 <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
             </a>
@@ -984,49 +992,12 @@ function renderCustomPreview(item) {
 }
 window.renderCustomPreview = renderCustomPreview;
 
-// Dynamic link update logic for custom generator (Real-time enablement)
-function updateCustomAffiliateLink(input) {
-    const linkValue = input.value.trim();
-    if (!window.customGeneratedItem) return;
-
-    window.customGeneratedItem.affiliate_link = linkValue;
-    const hasLink = !!linkValue;
-
-    // Update copy box text
-    const copyBox = document.getElementById("copy-box-custom");
-    if (copyBox) {
-        copyBox.textContent = window.customGeneratedItem.copy.replace("[LINK_AFILIADO]", linkValue || "[COLE O SEU LINK DE AFILIADO MANUALMENTE PARA ATIVAR]");
-    }
-
-    // Update copy button state
-    const btnCopy = document.getElementById("btn-copy-custom");
-    if (btnCopy) {
-        btnCopy.disabled = !hasLink;
-    }
-
-    // Update WhatsApp button state and URL
-    const btnWhatsapp = document.getElementById("btn-whatsapp-custom");
-    if (btnWhatsapp) {
-        if (hasLink) {
-            btnWhatsapp.classList.remove("disabled-btn");
-            btnWhatsapp.removeAttribute("onclick");
-            btnWhatsapp.href = `https://api.whatsapp.com/send?text=${encodeURIComponent(window.customGeneratedItem.copy.replace("[LINK_AFILIADO]", linkValue))}`;
-        } else {
-            btnWhatsapp.classList.add("disabled-btn");
-            btnWhatsapp.setAttribute("onclick", "return false;");
-            btnWhatsapp.href = "#";
-        }
-    }
-}
-window.updateCustomAffiliateLink = updateCustomAffiliateLink;
-
 // Copy text function for custom generator
 function copyCustomToClipboard(button) {
     if (!window.customGeneratedItem) return;
     
     try {
-        const text = window.customGeneratedItem.copy.replace("[LINK_AFILIADO]", window.customGeneratedItem.affiliate_link || "");
-        navigator.clipboard.writeText(text).then(() => {
+        navigator.clipboard.writeText(window.customGeneratedItem.copy).then(() => {
             const originalHTML = button.innerHTML;
             button.className = "btn-copy copied";
             button.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
