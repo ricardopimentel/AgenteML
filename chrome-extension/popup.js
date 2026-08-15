@@ -9,20 +9,18 @@ document.addEventListener("DOMContentLoaded", function() {
         statusMsg.style.display = "block";
     }
 
-    // 1. Try to read active tab URL
-    if (typeof chrome !== "undefined" && chrome.tabs) {
-        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-            if (tabs && tabs[0]) {
-                const activeUrl = tabs[0].url;
-                if (activeUrl && (
-                    activeUrl.includes("mercadolivre.com") || 
-                    activeUrl.includes("mercadolibre.com") || 
-                    activeUrl.includes("meli.la")
-                )) {
-                    urlInput.value = activeUrl;
-                    showStatus("Link da aba ativa capturado!", "success");
+    // 1. Try to read URL from clipboard
+    if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(text => {
+            const trimmed = text.trim();
+            if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+                if (trimmed.includes("mercadolivre.com") || trimmed.includes("mercadolibre.com") || trimmed.includes("meli.la")) {
+                    urlInput.value = trimmed;
+                    showStatus("Link detectado na área de transferência!", "success");
                 }
             }
+        }).catch(err => {
+            // Silence clipboard read errors/permissions block and keep field empty
         });
     }
 

@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Gere anúncios de afiliados com IA no painel AgenteML a partir do seu navegador.",
   "permissions": [
+    "clipboardRead",
     "activeTab",
     "tabs"
   ],
