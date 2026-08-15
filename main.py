@@ -22,9 +22,6 @@ class ConfigSchema(BaseModel):
     GEMINI_API_KEY: str
     POST_TIMES: str
     ADMIN_PASSWORD: str
-    ML_AFFILIATE_COOKIE: str
-    ML_AFFILIATE_CSRF_TOKEN: str
-    ML_AFFILIATE_TAG: str
 
 class ShortLinkSchema(BaseModel):
     productId: str
@@ -34,6 +31,9 @@ class UpdateLinkSchema(BaseModel):
     timestamp: str
     title: str
     affiliate_link: str
+
+class CustomOfferSchema(BaseModel):
+    url: str
 
 class LoginSchema(BaseModel):
     password: str
@@ -93,82 +93,124 @@ def trigger_agent(background_tasks: BackgroundTasks):
     return {"status": "success", "message": "Fluxo do agente disparado em segundo plano!"}
 
 
-@app.post("/api/shorten-link", dependencies=[Depends(verify_auth)])
-def shorten_link(data: ShortLinkSchema):
+@app.post("/api/generate-custom-offer", dependencies=[Depends(verify_auth)])
+def generate_custom_offer(data: CustomOfferSchema):
     import requests
-    # Retrieve cookie and token from env
-    cookie = os.getenv("ML_AFFILIATE_COOKIE", "")
-    csrf_token = os.getenv("ML_AFFILIATE_CSRF_TOKEN", "")
-    
-    if not cookie or not csrf_token:
-        raise HTTPException(
-            status_code=400,
-            detail="Credenciais PWA do Mercado Livre ausentes no arquivo .env (ML_AFFILIATE_COOKIE e ML_AFFILIATE_CSRF_TOKEN)."
-        )
+    import urllib.parse
+    import re
+    from bs4 import BeautifulSoup
+    import ai_copywriter
+
+    url = data.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="Por favor, forneça uma URL de produto válida.")
         
-    target_url = "https://www.mercadolivre.com.br/affiliate-program/api/v2/affiliates/createLink"
+    parsed = urllib.parse.urlparse(url)
+    if "mercadolivre.com.br" not in parsed.netloc and "mercadolibre.com" not in parsed.netloc:
+        raise HTTPException(status_code=400, detail="A URL fornecida não é do Mercado Livre.")
+        
+    prefix = "www"
+    if "produto" in parsed.netloc:
+        prefix = "produto"
+        
+    mirror_domain = f"{prefix}-mercadolivre-com-br.translate.goog"
+    mirror_url = f"https://{mirror_domain}{parsed.path}?_x_tr_sl=auto&_x_tr_tl=pt&_x_tr_hl=pt-BR"
     
     headers = {
-        "Content-Type": "application/json",
-        "Cookie": cookie,
-        "X-Csrf-Token": csrf_token,
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        "Accept": "application/json",
-        "Origin": "https://www.mercadolivre.com.br",
-        "Referer": "https://www.mercadolivre.com.br/social/afiliados/links"
-    }
-    
-    tag = os.getenv("ML_AFFILIATE_TAG", "shopp-ml2010")
-    payload = {
-        "itemId": data.productId,
-        "itemAddToList": data.productId,
-        "tag": tag,
-        "type": "user_product",
-        "buyBoxWinner": data.productId,
-        "extraCommission": "true",
-        "urls": [data.originalUrl]
+        "Accept-Language": "pt-BR,pt;q=0.9"
     }
     
     try:
-        response = requests.post(target_url, headers=headers, json=payload, timeout=15)
-        
-        if response.status_code in [401, 403]:
-            raise HTTPException(
-                status_code=401,
-                detail="Sessão expirada - Atualize os cookies no .env"
-            )
-            
+        response = requests.get(mirror_url, headers=headers, timeout=15)
         if response.status_code != 200:
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Erro do Mercado Livre (Status {response.status_code}): {response.text}"
-            )
+            raise HTTPException(status_code=502, detail=f"Erro ao acessar espelho do produto (Status {response.status_code}).")
             
-        res_data = response.json()
-        short_url = res_data.get("short_url")
+        soup = BeautifulSoup(response.text, "html.parser")
         
-        if not short_url:
-            # Fallback check if structure is nested
-            if isinstance(res_data, list) and len(res_data) > 0:
-                short_url = res_data[0].get("short_url")
-            elif isinstance(res_data, dict) and "urls" in res_data:
-                urls = res_data.get("urls", [])
-                if urls and isinstance(urls, list) and isinstance(urls[0], dict):
-                    short_url = urls[0].get("short_url")
-                    
-        if not short_url:
-            raise HTTPException(
-                status_code=522,
-                detail=f"Resposta recebida sem short_url: {res_data}"
-            )
+        # 1. Title Extraction
+        title_meta = soup.find("meta", property="og:title")
+        title = title_meta.get("content") if title_meta else None
+        if not title:
+            title_h1 = soup.find("h1")
+            title = title_h1.text.strip() if title_h1 else "Produto Mercado Livre"
             
-        return {"status": "success", "short_url": short_url}
+        if " - Google Tradutor" in title:
+            title = title.replace(" - Google Tradutor", "")
+            
+        # 2. Image Extraction
+        image_meta = soup.find("meta", property="og:image")
+        image_url = image_meta.get("content") if image_meta else ""
+        if not image_url:
+            img_el = soup.find("img", class_="ui-pdp-image") or soup.find("img", class_="ui-pdp-gallery__figure__image")
+            image_url = img_el.get("src") if img_el else ""
+            
+        # 3. Price & Discount Extraction
+        price_meta = soup.find("meta", itemprop="price")
+        price_val = price_meta.get("content") if price_meta else None
+        
+        if price_val:
+            try:
+                price_float = float(price_val)
+                if price_float.is_integer():
+                    price_str = f"R${int(price_float)}"
+                else:
+                    price_str = f"R${price_float:.2f}".replace(".", ",")
+            except Exception:
+                price_str = f"R${price_val}"
+        else:
+            price_fraction_el = soup.select_one(".ui-pdp-price__second-line .andes-money-amount__fraction") or soup.find(class_="andes-money-amount__fraction")
+            price_str = f"R${price_fraction_el.text.strip()}" if price_fraction_el else "Sob Consulta"
+            
+        prev_el = soup.find(class_="andes-money-amount--previous")
+        original_price = ""
+        if prev_el:
+            prev_fraction = prev_el.find(class_="andes-money-amount__fraction")
+            if prev_fraction:
+                original_price = f"R${prev_fraction.text.strip()}"
+                
+        disc_el = soup.find(class_="andes-money-amount__discount")
+        discount = ""
+        if disc_el:
+            discount = disc_el.text.strip()
+            
+        if not discount and original_price and price_str != "Sob Consulta":
+            try:
+                orig_num = float(re.sub(r"[^\d,]", "", original_price).replace(",", "."))
+                curr_num = float(re.sub(r"[^\d,]", "", price_str).replace(",", "."))
+                if orig_num > curr_num:
+                    pct = int(((orig_num - curr_num) / orig_num) * 100)
+                    discount = f"{pct}% OFF"
+            except Exception:
+                pass
+                
+        clean_url = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        
+        copy = ai_copywriter.generate_whatsapp_copy(
+            title=title,
+            price=price_str,
+            original_price=original_price,
+            discount=discount or "Promoção",
+            link="[LINK_AFILIADO]"
+        )
+        
+        return {
+            "status": "success",
+            "item": {
+                "title": title,
+                "price": price_str,
+                "original_price": original_price,
+                "discount": discount or "Promoção",
+                "original_link": clean_url,
+                "image_url": image_url,
+                "copy": copy
+            }
+        }
         
     except requests.exceptions.RequestException as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Falha de rede ao conectar com Mercado Livre: {str(e)}"
-        )
+        raise HTTPException(status_code=502, detail=f"Erro de rede ao acessar o produto: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao processar produto: {str(e)}")
 
 
 @app.get("/api/proxy-image")

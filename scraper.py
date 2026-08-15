@@ -74,12 +74,6 @@ def scrape_mercado_livre_deals(limit=10, randomize=True):
     
     settings = Config.get_all()
     affiliate_id = settings.get("MERCADO_LIVRE_AFFILIATE_ID", "")
-    cookie = settings.get("ML_AFFILIATE_COOKIE", "")
-    csrf_token = settings.get("ML_AFFILIATE_CSRF_TOKEN", "")
-    tag = settings.get("ML_AFFILIATE_TAG", "shopp-ml2010")
-    
-    if not cookie or not csrf_token:
-        raise ValueError("Sessão do Mercado Livre (Proxy) não configurada no .env. Atualize os cookies nas configurações do painel.")
     
     for page in pages_to_try:
         url = f"https://www.mercadolivre.com.br/ofertas?page={page}" if page > 1 else "https://www.mercadolivre.com.br/ofertas"

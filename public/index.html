@@ -94,64 +94,106 @@
             </button>
         </div>
 
+        <!-- TAB BAR -->
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('gerador-individual')">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Gerador Individual
+            </button>
+            <button class="tab-btn" onclick="switchTab('ofertas-diarias')">
+                <i class="fa-solid fa-calendar-days"></i> Ofertas Diárias
+            </button>
+        </div>
+
         <!-- MAIN LAYOUT -->
         <main class="app-content">
             
-            <!-- CONTROL BOARD -->
-            <div class="panel panel-control">
-                <div class="panel-header">
-                    <i class="fa-solid fa-gamepad"></i>
-                    <h2>Painel de Controle</h2>
-                </div>
-                <div class="panel-body control-actions">
-                    <button id="btn-trigger" class="btn btn-gradient">
-                        <i class="fa-solid fa-bolt"></i> Executar Agente Agora
-                    </button>
-                    
-                    <div class="status-summary">
-                        <div class="summary-item">
-                            <span class="summary-label">Última Execução</span>
-                            <span class="summary-value" id="last-run-time">Nenhuma</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Resultado</span>
-                            <span class="summary-value" id="last-run-status">Aguardando</span>
-                        </div>
-                        <div class="summary-item">
-                            <span class="summary-label">Itens Gerados</span>
-                            <span class="summary-value" id="last-run-count">0</span>
-                        </div>
+            <!-- TAB 1: GERADOR INDIVIDUAL -->
+            <div id="gerador-individual-content" class="tab-content active" style="width: 100%; display: flex; flex-direction: column; gap: 20px;">
+                <div class="panel">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <h2>Gerador de Copy com IA</h2>
                     </div>
+                    <div class="panel-body">
+                        <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.90rem;">
+                            Insira a URL de qualquer produto do Mercado Livre abaixo. O sistema extrairá a imagem, título, preços e desconto para criar um anúncio de vendas altamente persuasivo com a inteligência artificial do Gemini.
+                        </p>
+                        <form id="custom-offer-form" style="display: flex; flex-direction: column; gap: 15px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label for="custom-product-url">Link do Produto Mercado Livre</label>
+                                <input type="url" id="custom-product-url" placeholder="https://produto.mercadolivre.com.br/MLB-XXXX..." required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.90rem;" />
+                            </div>
+                            <button type="submit" id="btn-generate-custom" class="btn btn-gradient" style="align-self: flex-start; padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-magic"></i> Gerar Anúncio com IA
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- DYNAMIC PREVIEW CARD (HIDDEN BY DEFAULT) -->
+                <div id="custom-preview-card" class="offer-card" style="display: none; border: 1px solid var(--border-color); border-radius: 12px; background-color: rgba(255, 255, 255, 0.01); padding: 18px;">
+                    <!-- Appended dynamically in app.js -->
                 </div>
             </div>
 
-            <!-- LOGS BOX -->
-            <div class="panel panel-logs">
-                <div class="panel-header">
-                    <i class="fa-solid fa-terminal"></i>
-                    <h2>Console de Logs</h2>
-                    <button class="btn-icon" onclick="fetchLogs()" title="Atualizar Logs">
-                        <i class="fa-solid fa-rotate"></i>
-                    </button>
-                </div>
-                <div class="panel-body console-body" id="logs-console">
-                    [Sistema] Carregando logs...
-                </div>
-            </div>
-
-            <!-- HISTORY OF OFFERS -->
-            <div class="panel panel-history">
-                <div class="panel-header">
-                    <i class="fa-solid fa-history"></i>
-                    <h2>Histórico de Ofertas Geradas</h2>
-                </div>
-                <div class="panel-body history-body" id="history-container">
-                    <div class="empty-state">
-                        <i class="fa-solid fa-box-open"></i>
-                        <p>Nenhuma oferta gerada ainda. Execute o agente acima para iniciar!</p>
+            <!-- TAB 2: OFERTAS DIÁRIAS -->
+            <div id="ofertas-diarias-content" class="tab-content" style="width: 100%; display: none; flex-direction: column; gap: 20px;">
+                <!-- CONTROL BOARD -->
+                <div class="panel panel-control">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-gamepad"></i>
+                        <h2>Painel de Controle</h2>
+                    </div>
+                    <div class="panel-body control-actions">
+                        <button id="btn-trigger" class="btn btn-gradient">
+                            <i class="fa-solid fa-bolt"></i> Executar Agente Agora
+                        </button>
+                        
+                        <div class="status-summary">
+                            <div class="summary-item">
+                                <span class="summary-label">Última Execução</span>
+                                <span class="summary-value" id="last-run-time">Nenhuma</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Resultado</span>
+                                <span class="summary-value" id="last-run-status">Aguardando</span>
+                            </div>
+                            <div class="summary-item">
+                                <span class="summary-label">Itens Gerados</span>
+                                <span class="summary-value" id="last-run-count">0</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div id="pagination-controls" class="pagination-controls"></div>
+
+                <!-- LOGS BOX -->
+                <div class="panel panel-logs">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-terminal"></i>
+                        <h2>Console de Logs</h2>
+                        <button class="btn-icon" onclick="fetchLogs()" title="Atualizar Logs">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                    <div class="panel-body console-body" id="logs-console">
+                        [Sistema] Carregando logs...
+                    </div>
+                </div>
+
+                <!-- HISTORY OF OFFERS -->
+                <div class="panel panel-history">
+                    <div class="panel-header">
+                        <i class="fa-solid fa-history"></i>
+                        <h2>Histórico de Ofertas Geradas</h2>
+                    </div>
+                    <div class="panel-body history-body" id="history-container">
+                        <div class="empty-state">
+                            <i class="fa-solid fa-box-open"></i>
+                            <p>Nenhuma oferta gerada ainda. Execute o agente acima para iniciar!</p>
+                        </div>
+                    </div>
+                    <div id="pagination-controls" class="pagination-controls"></div>
+                </div>
             </div>
 
         </main>
@@ -223,25 +265,7 @@
                     </div>
                 </div>
 
-                <!-- Mercado Livre Session Section -->
-                <div class="form-section">
-                    <h3><i class="fa-solid fa-cookie-bite"></i> Sessão Mercado Livre (Proxy)</h3>
-                    <div class="form-group">
-                        <label for="ML_AFFILIATE_COOKIE">Cookie de Sessão (PWA)</label>
-                        <textarea id="ML_AFFILIATE_COOKIE" rows="3" placeholder="Cole o cookie completo de sessão do Mercado Livre aqui..."></textarea>
-                        <small>Necessário para gerar links curtos rastreáveis automaticamente.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="ML_AFFILIATE_CSRF_TOKEN">Token CSRF (X-Csrf-Token)</label>
-                        <input type="text" id="ML_AFFILIATE_CSRF_TOKEN" placeholder="Insira o valor do x-csrf-token">
-                        <small>Necessário para autorizar as requisições de geração de links.</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="ML_AFFILIATE_TAG">Tag / Canal de Divulgação (Tag/Nick)</label>
-                        <input type="text" id="ML_AFFILIATE_TAG" placeholder="Ex: shopp-ml2010" required>
-                        <small>O identificador do Canal configurado no seu portal de afiliado.</small>
-                    </div>
-                </div>
+
 
                 <div class="form-actions">
                     <button type="submit" class="btn btn-primary btn-block">

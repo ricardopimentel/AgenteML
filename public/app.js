@@ -169,6 +169,9 @@ function showApp() {
     loginOverlay.style.display = "none";
     appContainer.style.display = "flex";
     
+    // Switch to default tab
+    switchTab('gerador-individual');
+    
     // Load initial data
     fetchConfig();
     fetchStatus();
@@ -302,10 +305,7 @@ async function saveConfig(e) {
         MERCADO_LIVRE_AFFILIATE_ID: document.getElementById("MERCADO_LIVRE_AFFILIATE_ID").value,
         GEMINI_API_KEY: document.getElementById("GEMINI_API_KEY").value,
         POST_TIMES: document.getElementById("POST_TIMES").value,
-        ADMIN_PASSWORD: document.getElementById("ADMIN_PASSWORD").value,
-        ML_AFFILIATE_COOKIE: document.getElementById("ML_AFFILIATE_COOKIE").value,
-        ML_AFFILIATE_CSRF_TOKEN: document.getElementById("ML_AFFILIATE_CSRF_TOKEN").value,
-        ML_AFFILIATE_TAG: document.getElementById("ML_AFFILIATE_TAG").value
+        ADMIN_PASSWORD: document.getElementById("ADMIN_PASSWORD").value
     };
     
     try {
@@ -855,3 +855,191 @@ async function saveAffiliateLink(button, timestamp, title) {
     }
 }
 window.saveAffiliateLink = saveAffiliateLink;
+
+// Tab Navigation Control
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    // Add active class to clicked button (matches onclick string)
+    const clickedBtn = document.querySelector(`.tab-btn[onclick*="${tabId}"]`);
+    if (clickedBtn) clickedBtn.classList.add('active');
+
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+        content.classList.remove('active');
+    });
+
+    const activeContent = document.getElementById(`${tabId}-content`);
+    if (activeContent) {
+        activeContent.style.display = 'flex';
+        activeContent.classList.add('active');
+    }
+}
+window.switchTab = switchTab;
+
+// Single Custom Offer Generator Logic
+document.addEventListener("DOMContentLoaded", () => {
+    const customOfferForm = document.getElementById("custom-offer-form");
+    const btnGenerateCustom = document.getElementById("btn-generate-custom");
+    const customPreviewCard = document.getElementById("custom-preview-card");
+
+    if (customOfferForm) {
+        customOfferForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const urlInput = document.getElementById("custom-product-url");
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            btnGenerateCustom.disabled = true;
+            btnGenerateCustom.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Gerando Anúncio...`;
+            customPreviewCard.style.display = "none";
+            customPreviewCard.innerHTML = "";
+
+            try {
+                const response = await request(getApiUrl("/api/generate-custom-offer"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url: url })
+                });
+
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.detail || "Erro ao gerar anúncio.");
+
+                window.customGeneratedItem = result.item;
+                renderCustomPreview(result.item);
+                showToast("Anúncio gerado com sucesso!", "success");
+            } catch (error) {
+                showToast("Erro ao processar: " + error.message, "error");
+            } finally {
+                btnGenerateCustom.disabled = false;
+                btnGenerateCustom.innerHTML = `<i class="fa-solid fa-magic"></i> Gerar Anúncio com IA`;
+            }
+        });
+    }
+});
+
+// Render Dynamic Custom Preview Card
+function renderCustomPreview(item) {
+    const customPreviewCard = document.getElementById("custom-preview-card");
+    if (!customPreviewCard) return;
+
+    const discountTag = item.discount ? `<span class="offer-discount-badge">${item.discount}</span>` : "";
+    const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
+    const hasLink = !!item.affiliate_link;
+    const copyPreview = item.copy.replace("[LINK_AFILIADO]", item.affiliate_link || "[COLE O SEU LINK DE AFILIADO MANUALMENTE PARA ATIVAR]");
+    const whatsappUrl = hasLink ? `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy.replace("[LINK_AFILIADO]", item.affiliate_link))}` : "#";
+
+    customPreviewCard.innerHTML = `
+        <div class="offer-product-info">
+            <div class="offer-thumb-wrapper">
+                <img src="${item.image_url}" class="offer-thumb" alt="Miniatura">
+            </div>
+            <div class="offer-details">
+                <div class="offer-title">${item.title}</div>
+                <div class="offer-price-row">
+                    ${originalPrice}
+                    <span class="offer-price-current">${item.price}</span>
+                    ${discountTag}
+                </div>
+            </div>
+        </div>
+        
+        <div class="manual-link-builder-row" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; margin: 10px 0;">
+            <div style="display: flex; gap: 10px; align-items: center; width: 100%; flex-wrap: wrap;">
+                <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); min-width: 160px;">Cole seu link de afiliado:</span>
+                <input type="text" 
+                       id="custom-affiliate-input"
+                       placeholder="meli.la/XXXX" 
+                       value="${item.affiliate_link || ''}" 
+                       oninput="updateCustomAffiliateLink(this)"
+                       style="flex-grow: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.85rem;" />
+            </div>
+        </div>
+        
+        <div class="offer-copy-section">
+            <div class="copy-header-row">
+                <span>Texto de Divulgação (WhatsApp):</span>
+                <button class="btn-copy" id="btn-copy-custom" ${!hasLink ? 'disabled' : ''} onclick="copyCustomToClipboard(this)">
+                    <i class="fa-regular fa-copy"></i> Copiar Texto
+                </button>
+            </div>
+            <div class="offer-copy-box" id="copy-box-custom">${copyPreview}</div>
+        </div>
+        
+        <div class="offer-actions">
+            <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')">
+                <i class="fa-regular fa-image"></i> Copiar Imagem
+            </button>
+            <a href="${whatsappUrl}" 
+               id="btn-whatsapp-custom"
+               class="btn-whatsapp ${!hasLink ? 'disabled-btn' : ''}" 
+               ${!hasLink ? 'onclick="return false;"' : ''}
+               target="_blank">
+                <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
+            </a>
+        </div>
+    `;
+    customPreviewCard.style.display = "block";
+}
+window.renderCustomPreview = renderCustomPreview;
+
+// Dynamic link update logic for custom generator (Real-time enablement)
+function updateCustomAffiliateLink(input) {
+    const linkValue = input.value.trim();
+    if (!window.customGeneratedItem) return;
+
+    window.customGeneratedItem.affiliate_link = linkValue;
+    const hasLink = !!linkValue;
+
+    // Update copy box text
+    const copyBox = document.getElementById("copy-box-custom");
+    if (copyBox) {
+        copyBox.textContent = window.customGeneratedItem.copy.replace("[LINK_AFILIADO]", linkValue || "[COLE O SEU LINK DE AFILIADO MANUALMENTE PARA ATIVAR]");
+    }
+
+    // Update copy button state
+    const btnCopy = document.getElementById("btn-copy-custom");
+    if (btnCopy) {
+        btnCopy.disabled = !hasLink;
+    }
+
+    // Update WhatsApp button state and URL
+    const btnWhatsapp = document.getElementById("btn-whatsapp-custom");
+    if (btnWhatsapp) {
+        if (hasLink) {
+            btnWhatsapp.classList.remove("disabled-btn");
+            btnWhatsapp.removeAttribute("onclick");
+            btnWhatsapp.href = `https://api.whatsapp.com/send?text=${encodeURIComponent(window.customGeneratedItem.copy.replace("[LINK_AFILIADO]", linkValue))}`;
+        } else {
+            btnWhatsapp.classList.add("disabled-btn");
+            btnWhatsapp.setAttribute("onclick", "return false;");
+            btnWhatsapp.href = "#";
+        }
+    }
+}
+window.updateCustomAffiliateLink = updateCustomAffiliateLink;
+
+// Copy text function for custom generator
+function copyCustomToClipboard(button) {
+    if (!window.customGeneratedItem) return;
+    
+    try {
+        const text = window.customGeneratedItem.copy.replace("[LINK_AFILIADO]", window.customGeneratedItem.affiliate_link || "");
+        navigator.clipboard.writeText(text).then(() => {
+            const originalHTML = button.innerHTML;
+            button.className = "btn-copy copied";
+            button.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+            
+            setTimeout(() => {
+                button.className = "btn-copy";
+                button.innerHTML = originalHTML;
+            }, 2000);
+        }).catch(err => {
+            showToast("Erro ao copiar: " + err.message, "error");
+        });
+    } catch (error) {
+        showToast("Erro ao copiar texto.", "error");
+    }
+}
+window.copyCustomToClipboard = copyCustomToClipboard;
