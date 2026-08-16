@@ -95,6 +95,15 @@ function getApiUrl(path) {
     return apiBaseUrl + path;
 }
 
+// Helper to get proxied image URLs to bypass referer/hotlinking blocks
+function getProxiedImageUrl(imageUrl) {
+    if (!imageUrl) return "";
+    if (imageUrl.includes("sygmcdn.com") || imageUrl.includes("shopeemobile.com") || imageUrl.includes("mercadolivre.com") || imageUrl.includes("mlstatic.com") || imageUrl.includes("susercontent.com")) {
+        return getApiUrl("/api/proxy-image?url=" + encodeURIComponent(imageUrl));
+    }
+    return imageUrl;
+}
+
 // Fetch headers helper
 function getHeaders() {
     return {
@@ -641,7 +650,7 @@ function renderHistoryColumn(items, container, paginationId, storeType, page, ch
         card.innerHTML = `
             <div class="offer-product-info" style="display: flex; gap: 15px; margin-bottom: 12px;">
                 <div class="offer-thumb-wrapper" style="width: 70px; height: 70px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color);">
-                    <img src="${item.image_url}" class="offer-thumb" alt="Miniatura" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                    <img src="${getProxiedImageUrl(item.image_url)}" class="offer-thumb" alt="Miniatura" style="max-width: 100%; max-height: 100%; object-fit: contain;">
                 </div>
                 <div class="offer-details" style="display: flex; flex-direction: column; justify-content: center; flex-grow: 1;">
                     <div class="offer-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); line-height: 1.3; margin-bottom: 5px; word-break: break-word;">${item.title}</div>
@@ -1054,7 +1063,7 @@ function renderCustomPreview(item) {
     customPreviewCard.innerHTML = `
         <div class="offer-product-info">
             <div class="offer-thumb-wrapper">
-                <img src="${item.image_url}" class="offer-thumb" alt="Miniatura">
+                <img src="${getProxiedImageUrl(item.image_url)}" class="offer-thumb" alt="Miniatura">
             </div>
             <div class="offer-details">
                 <div class="offer-title">${item.title}</div>
