@@ -55,7 +55,11 @@ def generate_template_copy(title, price, original_price, discount, link):
     """
     original_line = f"~~{original_price}~~ " if original_price else ""
     
-    copy = f"""🚨 *OFERTA IMPERDÍVEL NO MERCADO LIVRE!* 🚨
+    store_name = "Mercado Livre"
+    if "shopee" in link.lower() or "shope.ee" in link.lower():
+        store_name = "Shopee"
+        
+    copy = f"""🚨 *OFERTA IMPERDÍVEL NA {store_name.upper()}!* 🚨
 
 🔥 *{title}*
 
@@ -65,7 +69,7 @@ Por apenas: *{price}* 😱
 
 ✨ *Por que vale a pena?*
 • Produto com excelente custo-benefício
-• Garantia e entrega rápida do Mercado Livre
+• Garantia e entrega rápida da {store_name}
 • Perfeito para o seu dia a dia
 
 ⚠️ *Aproveite logo, pois o estoque e a promoção podem acabar a qualquer momento!*

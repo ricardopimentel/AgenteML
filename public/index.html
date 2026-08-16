@@ -116,12 +116,12 @@
                     </div>
                     <div class="panel-body">
                         <p style="color: var(--text-secondary); margin-bottom: 20px; font-size: 0.90rem;">
-                            Insira seu <strong>link curto de afiliado</strong> (ex: <code>meli.la/...</code>) ou seu <strong>link de afiliado longo</strong> direto do Mercado Livre. O sistema irá decodificar o link de destino automaticamente, buscar o produto e gerar o anúncio de vendas com o seu link de afiliado inserido na copy!
+                            Insira seu link de afiliado do <strong>Mercado Livre</strong> (ex: <code>meli.la/...</code>) ou da <strong>Shopee</strong> (ex: <code>shope.ee/...</code>). O sistema irá decodificar o link de destino automaticamente, buscar o produto e gerar o anúncio de vendas com o seu link de afiliado embutido na copy!
                         </p>
                         <form id="custom-offer-form" style="display: flex; flex-direction: column; gap: 15px;">
                             <div class="form-group" style="margin-bottom: 0;">
-                                <label for="custom-product-url">Link de Afiliado do Produto (meli.la ou completo)</label>
-                                <input type="url" id="custom-product-url" placeholder="https://meli.la/XXXX ou link de afiliado do Mercado Livre..." required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.90rem;" />
+                                <label for="custom-product-url">Link de Afiliado (Mercado Livre ou Shopee)</label>
+                                <input type="url" id="custom-product-url" placeholder="https://meli.la/XXXX, https://shope.ee/XXXX ou link completo..." required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-primary); font-size: 0.90rem;" />
                             </div>
                             <button type="submit" id="btn-generate-custom" class="btn btn-gradient" style="align-self: flex-start; padding: 12px 24px; display: inline-flex; align-items: center; gap: 8px;">
                                 <i class="fa-solid fa-magic"></i> Gerar Anúncio com IA
@@ -181,18 +181,42 @@
                 </div>
 
                 <!-- HISTORY OF OFFERS -->
-                <div class="panel panel-history">
+                <div class="panel panel-history" style="max-width: 100%;">
                     <div class="panel-header">
                         <i class="fa-solid fa-history"></i>
                         <h2>Histórico de Ofertas Geradas</h2>
                     </div>
-                    <div class="panel-body history-body" id="history-container">
-                        <div class="empty-state">
-                            <i class="fa-solid fa-box-open"></i>
-                            <p>Nenhuma oferta gerada ainda. Execute o agente acima para iniciar!</p>
+                    <div class="panel-body history-body" style="padding: 20px;">
+                        <div class="history-split-container" style="display: flex; gap: 20px; flex-wrap: wrap; width: 100%;">
+                            <!-- Mercado Livre Area -->
+                            <div class="history-area" style="flex: 1; min-width: 290px; display: flex; flex-direction: column; gap: 15px;">
+                                <h3 style="display: flex; align-items: center; gap: 10px; color: #FFE600; border-bottom: 2px solid rgba(255, 230, 0, 0.2); padding-bottom: 8px; margin-bottom: 10px; font-size: 1.1rem; margin-top: 0;">
+                                    <i class="fa-solid fa-store"></i> Mercado Livre
+                                </h3>
+                                <div id="ml-history-container" style="display: flex; flex-direction: column; gap: 15px; min-height: 100px;">
+                                    <div class="empty-state" style="padding: 20px;">
+                                        <i class="fa-solid fa-box-open" style="font-size: 1.8rem; opacity: 0.5;"></i>
+                                        <p style="font-size: 0.85rem; margin-top: 5px;">Nenhuma oferta do ML ainda.</p>
+                                    </div>
+                                </div>
+                                <div id="ml-pagination-controls" class="pagination-controls" style="margin-top: 10px;"></div>
+                            </div>
+
+                            <!-- Shopee Area -->
+                            <div class="history-area" style="flex: 1; min-width: 290px; display: flex; flex-direction: column; gap: 15px;">
+                                <h3 style="display: flex; align-items: center; gap: 10px; color: #EE4D2D; border-bottom: 2px solid rgba(238, 77, 45, 0.2); padding-bottom: 8px; margin-bottom: 10px; font-size: 1.1rem; margin-top: 0;">
+                                    <i class="fa-solid fa-bag-shopping"></i> Shopee
+                                </h3>
+                                <div id="shopee-history-container" style="display: flex; flex-direction: column; gap: 15px; min-height: 100px;">
+                                    <div class="empty-state" style="padding: 20px;">
+                                        <i class="fa-solid fa-box-open" style="font-size: 1.8rem; opacity: 0.5;"></i>
+                                        <p style="font-size: 0.85rem; margin-top: 5px;">Nenhuma oferta da Shopee ainda.</p>
+                                    </div>
+                                </div>
+                                <div id="shopee-pagination-controls" class="pagination-controls" style="margin-top: 10px;"></div>
+                            </div>
                         </div>
                     </div>
-                    <div id="pagination-controls" class="pagination-controls"></div>
                 </div>
             </div>
 

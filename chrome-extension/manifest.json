@@ -6,7 +6,15 @@
   "permissions": [
     "clipboardRead",
     "activeTab",
-    "tabs"
+    "tabs",
+    "scripting"
+  ],
+  "host_permissions": [
+    "*://*.mercadolivre.com.br/*",
+    "*://*.mercadolibre.com/*",
+    "*://*.meli.la/*",
+    "*://*.shopee.com.br/*",
+    "*://*.shope.ee/*"
   ],
   "action": {
     "default_popup": "popup.html"

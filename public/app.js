@@ -22,7 +22,8 @@ const configForm = document.getElementById("config-form");
 const schedulerStatus = document.getElementById("scheduler-status");
 const nextRunTime = document.getElementById("next-run-time");
 const logsConsole = document.getElementById("logs-console");
-const historyContainer = document.getElementById("history-container");
+const mlHistoryContainer = document.getElementById("ml-history-container");
+const shopeeHistoryContainer = document.getElementById("shopee-history-container");
 
 const btnTrigger = document.getElementById("btn-trigger");
 const btnTestEmail = document.getElementById("btn-test-email");
@@ -41,7 +42,8 @@ let serverTimeOffset = 0;
 let clockTickingInterval = null;
 
 // Pagination variables
-let currentPage = 1;
+let mlCurrentPage = 1;
+let shopeeCurrentPage = 1;
 const itemsPerPage = 5;
 
 // Initialize Dashboard
@@ -195,6 +197,14 @@ function showApp() {
         const urlInput = document.getElementById("custom-product-url");
         if (urlInput) {
             urlInput.value = affiliateLink;
+            
+            // Capture optional details from extension redirect
+            window.extCapturedTitle = urlParams.get('title') || '';
+            window.extCapturedPrice = urlParams.get('price') || '';
+            window.extCapturedImage = urlParams.get('image_url') || '';
+            window.extComparePrice = urlParams.get('compare_price') || '';
+            window.extCompareLink = urlParams.get('compare_link') || '';
+            window.extCompareStore = urlParams.get('compare_store') || '';
             
             // Switch to correct tab
             switchTab('gerador-individual');
@@ -535,136 +545,168 @@ async function fetchHistory() {
         if (!response.ok) throw new Error("Falha ao carregar histórico");
         const history = await response.json();
         
-        // Flatten all run items
-        let allItems = [];
+        // Flatten and group all run items
+        let mlItems = [];
+        let shopeeItems = [];
+        
         history.forEach((run, runIndex) => {
             run.items.forEach((item, itemIndex) => {
-                allItems.push({
+                const flatItem = {
                     ...item,
                     timestamp: run.timestamp,
                     runIndex: runIndex,
                     itemIndex: itemIndex
-                });
+                };
+                
+                const linkToCheck = (item.original_link || item.affiliate_link || "").toLowerCase();
+                const isShopee = linkToCheck.includes("shopee.com") || linkToCheck.includes("shope.ee");
+                
+                if (isShopee) {
+                    shopeeItems.push(flatItem);
+                } else {
+                    mlItems.push(flatItem);
+                }
             });
         });
-        
-        if (allItems.length === 0) {
-            historyContainer.innerHTML = `
-                <div class="empty-state">
-                    <i class="fa-solid fa-box-open"></i>
-                    <p>Nenhuma oferta gerada ainda. Execute o agente acima para iniciar!</p>
-                </div>`;
-            const controlsContainer = document.getElementById("pagination-controls");
-            if (controlsContainer) {
-                controlsContainer.innerHTML = "";
-                controlsContainer.style.display = "none";
-            }
-            return;
-        }
         
         // Save history globally for clipboard access
         window.historyData = history;
         
-        const totalItems = allItems.length;
-        const totalPages = Math.ceil(totalItems / itemsPerPage);
+        // Render ML History
+        renderHistoryColumn(mlItems, mlHistoryContainer, "ml-pagination-controls", "ml", mlCurrentPage, changeMLPage);
         
-        // Bounds checking
-        if (currentPage > totalPages) currentPage = totalPages;
-        if (currentPage < 1) currentPage = 1;
-        
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-        const pageItems = allItems.slice(startIndex, endIndex);
-        
-        historyContainer.innerHTML = "";
-        
-        pageItems.forEach((item) => {
-            const card = document.createElement("div");
-            card.className = "offer-card";
-            card.style.border = "1px solid var(--border-color)";
-            card.style.borderRadius = "12px";
-            card.style.backgroundColor = "rgba(255, 255, 255, 0.01)";
-            card.style.marginBottom = "15px";
-            
-            const discountTag = item.discount ? `<span class="offer-discount-badge">${item.discount}</span>` : "";
-            const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
-            
-            const hasLink = !!item.affiliate_link;
-            const copyPreview = item.copy.replace("[LINK_AFILIADO]", item.affiliate_link || "[COLE O LINK DE AFILIADO PARA ATIVAR]");
-            const whatsappUrl = hasLink ? `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy.replace("[LINK_AFILIADO]", item.affiliate_link))}` : "#";
-            
-            card.innerHTML = `
-                <div class="offer-product-info">
-                    <div class="offer-thumb-wrapper">
-                        <img src="${item.image_url}" class="offer-thumb" alt="Miniatura">
-                    </div>
-                    <div class="offer-details">
-                        <div class="offer-title">${item.title}</div>
-                        <div class="offer-price-row">
-                            ${originalPrice}
-                            <span class="offer-price-current">${item.price}</span>
-                            ${discountTag}
-                        </div>
-                        <small style="color: var(--text-muted); margin-top: 5px; display: inline-flex; align-items: center; gap: 5px;">
-                            <i class="fa-solid fa-calendar-day"></i> Gerado em: ${item.timestamp}
-                        </small>
-                    </div>
-                </div>
-                
-                <div class="manual-link-builder-row" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; margin: 10px 0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">1. Gere o link de afiliado oficial do ML:</span>
-                        <button class="btn-copy-original" onclick="copyOriginalLink(this, '${item.original_link}')">
-                            <i class="fa-regular fa-copy"></i> Copiar Link do Produto
-                        </button>
-                    </div>
-                    <div style="display: flex; gap: 10px; align-items: center; width: 100%; margin-top: 5px;">
-                        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); min-width: 140px;">2. Cole o link curto gerado:</span>
-                        <input type="text" 
-                               placeholder="meli.la/XXXX" 
-                               value="${item.affiliate_link || ''}" 
-                               style="flex-grow: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.85rem;" />
-                        <button class="btn-copy" onclick="saveAffiliateLink(this, '${item.timestamp}', '${item.title.replace(/'/g, "\\'")}')">
-                            Salvar Link
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="offer-copy-section">
-                    <div class="copy-header-row">
-                        <span>Texto de Divulgação (WhatsApp):</span>
-                        <button class="btn-copy" ${!hasLink ? 'disabled' : ''} onclick="copyToClipboard(this, ${item.runIndex}, ${item.itemIndex})">
-                            <i class="fa-regular fa-copy"></i> Copiar Texto
-                        </button>
-                    </div>
-                    <div class="offer-copy-box" id="copy-box-${item.runIndex}-${item.itemIndex}">${copyPreview}</div>
-                </div>
-                
-                <div class="offer-actions">
-                    <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')">
-                        <i class="fa-regular fa-image"></i> Copiar Imagem
-                    </button>
-                    <a href="${whatsappUrl}" 
-                       class="btn-whatsapp ${!hasLink ? 'disabled-btn' : ''}" 
-                       ${!hasLink ? 'onclick="return false;"' : ''}
-                       target="_blank">
-                        <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
-                    </a>
-                </div>
-            `;
-            historyContainer.appendChild(card);
-        });
-        
-        renderPaginationControls(totalPages);
+        // Render Shopee History
+        renderHistoryColumn(shopeeItems, shopeeHistoryContainer, "shopee-pagination-controls", "shopee", shopeeCurrentPage, changeShopeePage);
         
     } catch (error) {
-        historyContainer.innerHTML = `<div class="empty-state"><p>Erro ao carregar histórico: ${error.message}</p></div>`;
+        if (mlHistoryContainer) mlHistoryContainer.innerHTML = `<div class="empty-state"><p>Erro: ${error.message}</p></div>`;
+        if (shopeeHistoryContainer) shopeeHistoryContainer.innerHTML = `<div class="empty-state"><p>Erro: ${error.message}</p></div>`;
     }
 }
 
-// Render pagination buttons
-function renderPaginationControls(totalPages) {
-    const controlsContainer = document.getElementById("pagination-controls");
+// Render a single history column (ML or Shopee)
+function renderHistoryColumn(items, container, paginationId, storeType, page, changePageFn) {
+    if (!container) return;
+    
+    if (items.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state" style="padding: 20px;">
+                <i class="fa-solid fa-box-open" style="font-size: 1.8rem; opacity: 0.5;"></i>
+                <p style="font-size: 0.85rem; margin-top: 5px;">Nenhuma oferta da ${storeType === 'ml' ? 'Mercado Livre' : 'Shopee'} gerada ainda.</p>
+            </div>`;
+        const paginationEl = document.getElementById(paginationId);
+        if (paginationEl) {
+            paginationEl.innerHTML = "";
+            paginationEl.style.display = "none";
+        }
+        return;
+    }
+    
+    const totalItems = items.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    
+    // Bounds checking
+    let currentPageVal = page;
+    if (currentPageVal > totalPages) currentPageVal = totalPages;
+    if (currentPageVal < 1) currentPageVal = 1;
+    
+    // Set active page variables globally based on function reference
+    if (changePageFn === changeMLPage) mlCurrentPage = currentPageVal;
+    if (changePageFn === changeShopeePage) shopeeCurrentPage = currentPageVal;
+
+    const startIndex = (currentPageVal - 1) * itemsPerPage;
+    const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+    const pageItems = items.slice(startIndex, endIndex);
+    
+    container.innerHTML = "";
+    
+    pageItems.forEach((item) => {
+        const card = document.createElement("div");
+        card.className = "offer-card";
+        card.style.border = `1px solid ${storeType === 'ml' ? 'rgba(255, 230, 0, 0.15)' : 'rgba(238, 77, 45, 0.15)'}`;
+        card.style.borderRadius = "12px";
+        card.style.backgroundColor = "rgba(255, 255, 255, 0.01)";
+        card.style.marginBottom = "15px";
+        card.style.padding = "15px";
+        
+        const discountTag = item.discount ? `<span class="offer-discount-badge" style="background: ${storeType === 'ml' ? '#FFE600' : '#EE4D2D'}; color: #000; font-weight: bold; border-radius: 4px; padding: 2px 6px; font-size: 0.75rem;">${item.discount}</span>` : "";
+        const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
+        
+        const hasLink = !!item.affiliate_link;
+        const copyPreview = item.copy.replace("[LINK_AFILIADO]", item.affiliate_link || "[COLE O LINK DE AFILIADO PARA ATIVAR]");
+        const whatsappUrl = hasLink ? `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy.replace("[LINK_AFILIADO]", item.affiliate_link))}` : "#";
+        
+        const brandActionText = storeType === 'ml' ? '1. Gere o link de afiliado oficial do ML:' : '1. Copie o link do produto Shopee:';
+        
+        card.innerHTML = `
+            <div class="offer-product-info" style="display: flex; gap: 15px; margin-bottom: 12px;">
+                <div class="offer-thumb-wrapper" style="width: 70px; height: 70px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color);">
+                    <img src="${item.image_url}" class="offer-thumb" alt="Miniatura" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+                </div>
+                <div class="offer-details" style="display: flex; flex-direction: column; justify-content: center; flex-grow: 1;">
+                    <div class="offer-title" style="font-size: 0.95rem; font-weight: 600; color: var(--text-primary); line-height: 1.3; margin-bottom: 5px; word-break: break-word;">${item.title}</div>
+                    <div class="offer-price-row" style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                        ${originalPrice}
+                        <span class="offer-price-current" style="font-size: 1.1rem; font-weight: bold; color: var(--text-primary);">${item.price}</span>
+                        ${discountTag}
+                    </div>
+                    <small style="color: var(--text-muted); margin-top: 5px; display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem;">
+                        <i class="fa-solid fa-calendar-day"></i> Gerado em: ${item.timestamp}
+                    </small>
+                </div>
+            </div>
+            
+            <div class="manual-link-builder-row" style="display: flex; flex-direction: column; gap: 10px; padding: 12px; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color); border-radius: 8px; margin: 10px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);">${brandActionText}</span>
+                    <button class="btn-copy-original" onclick="copyOriginalLink(this, '${item.original_link}')" style="padding: 4px 8px; font-size: 0.80rem;">
+                        <i class="fa-regular fa-copy"></i> Copiar Link do Produto
+                    </button>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; width: 100%; margin-top: 5px;">
+                    <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); min-width: 130px;">2. Cole o link de afiliado:</span>
+                    <input type="text" 
+                           placeholder="${storeType === 'ml' ? 'meli.la/XXXX' : 'shope.ee/XXXX'}" 
+                           value="${item.affiliate_link || ''}" 
+                           style="flex-grow: 1; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.3); color: var(--text-primary); font-size: 0.85rem;" />
+                    <button class="btn-copy" onclick="saveAffiliateLink(this, '${item.timestamp}', '${item.title.replace(/'/g, "\\'")}')" style="padding: 6px 12px; font-size: 0.85rem;">
+                        Salvar Link
+                    </button>
+                </div>
+            </div>
+            
+            <div class="offer-copy-section" style="margin-top: 12px;">
+                <div class="copy-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Texto de Divulgação (WhatsApp):</span>
+                    <button class="btn-copy" ${!hasLink ? 'disabled' : ''} onclick="copyToClipboard(this, ${item.runIndex}, ${item.itemIndex})" style="padding: 4px 8px; font-size: 0.80rem;">
+                        <i class="fa-regular fa-copy"></i> Copiar Texto
+                    </button>
+                </div>
+                <div class="offer-copy-box" id="copy-box-${item.runIndex}-${item.itemIndex}" style="font-size: 0.85rem; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 6px; white-space: pre-wrap; font-family: monospace; max-height: 120px; overflow-y: auto;">${copyPreview}</div>
+            </div>
+            
+            <div class="offer-actions" style="display: flex; gap: 10px; margin-top: 12px;">
+                <button class="btn-copy-image" onclick="copyImageToClipboard(this, '${item.image_url}')" style="flex: 1; padding: 8px 12px; font-size: 0.85rem;">
+                    <i class="fa-regular fa-image"></i> Copiar Imagem
+                </button>
+                <a href="${whatsappUrl}" 
+                   class="btn-whatsapp ${!hasLink ? 'disabled-btn' : ''}" 
+                   ${!hasLink ? 'onclick="return false;"' : ''}
+                   target="_blank"
+                   style="flex: 1; padding: 8px 12px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 5px; text-decoration: none;">
+                    <i class="fa-brands fa-whatsapp"></i> Enviar p/ WhatsApp
+                </a>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+    
+    renderPaginationControlsSplit(totalPages, currentPageVal, paginationId, changePageFn);
+}
+
+// Render pagination buttons for split lists
+function renderPaginationControlsSplit(totalPages, page, paginationId, changePageFn) {
+    const controlsContainer = document.getElementById(paginationId);
     if (!controlsContainer) return;
     
     if (totalPages <= 1) {
@@ -674,29 +716,46 @@ function renderPaginationControls(totalPages) {
     }
     
     controlsContainer.style.display = "flex";
-    controlsContainer.innerHTML = `
-        <button class="btn-page" id="btn-page-prev" ${currentPage === 1 ? 'disabled' : ''} onclick="changePage(${currentPage - 1})">
-            <i class="fa-solid fa-chevron-left"></i> Anterior
-        </button>
-        <span class="page-info">Página ${currentPage} de ${totalPages}</span>
-        <button class="btn-page" id="btn-page-next" ${currentPage === totalPages ? 'disabled' : ''} onclick="changePage(${currentPage + 1})">
-            Próxima <i class="fa-solid fa-chevron-right"></i>
-        </button>
-    `;
+    controlsContainer.style.justifyContent = "center";
+    controlsContainer.style.alignItems = "center";
+    controlsContainer.style.gap = "10px";
+    
+    controlsContainer.innerHTML = "";
+    
+    const prevBtn = document.createElement("button");
+    prevBtn.className = "btn-page";
+    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
+    if (page === 1) prevBtn.disabled = true;
+    prevBtn.addEventListener("click", () => changePageFn(page - 1));
+    
+    const pageSpan = document.createElement("span");
+    pageSpan.className = "page-info";
+    pageSpan.textContent = `${page} / ${totalPages}`;
+    pageSpan.style.fontSize = "0.85rem";
+    
+    const nextBtn = document.createElement("button");
+    nextBtn.className = "btn-page";
+    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
+    if (page === totalPages) nextBtn.disabled = true;
+    nextBtn.addEventListener("click", () => changePageFn(page + 1));
+    
+    controlsContainer.appendChild(prevBtn);
+    controlsContainer.appendChild(pageSpan);
+    controlsContainer.appendChild(nextBtn);
 }
 
-// Action to navigate between pages
-function changePage(page) {
-    currentPage = page;
+function changeMLPage(page) {
+    mlCurrentPage = page;
     fetchHistory();
-    // Scroll layout to top of history container smoothly
-    const historyHeader = document.querySelector(".panel-history");
-    if (historyHeader) {
-        historyHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
 }
 
-window.changePage = changePage;
+function changeShopeePage(page) {
+    shopeeCurrentPage = page;
+    fetchHistory();
+}
+
+window.changeMLPage = changeMLPage;
+window.changeShopeePage = changeShopeePage;
 
 // PWA Installation Logic & Service Worker Registration
 if ('serviceWorker' in navigator) {
@@ -920,10 +979,32 @@ document.addEventListener("DOMContentLoaded", () => {
             customPreviewCard.innerHTML = "";
 
             try {
+                const bodyParams = { url: url };
+                if (window.extCapturedTitle) {
+                    bodyParams.title = window.extCapturedTitle;
+                    bodyParams.price = window.extCapturedPrice;
+                    bodyParams.image_url = window.extCapturedImage;
+                    
+                    // Consume after usage so subsequent manually typed links do not reuse old data
+                    window.extCapturedTitle = null;
+                    window.extCapturedPrice = null;
+                    window.extCapturedImage = null;
+                }
+
+                if (window.extComparePrice) {
+                    bodyParams.compare_price = window.extComparePrice;
+                    bodyParams.compare_link = window.extCompareLink;
+                    bodyParams.compare_store = window.extCompareStore;
+                    
+                    window.extComparePrice = null;
+                    window.extCompareLink = null;
+                    window.extCompareStore = null;
+                }
+
                 const response = await request(getApiUrl("/api/generate-custom-offer"), {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ url: url })
+                    body: JSON.stringify(bodyParams)
                 });
 
                 const result = await response.json();
@@ -951,6 +1032,25 @@ function renderCustomPreview(item) {
     const originalPrice = item.original_price ? `<span class="offer-price-original">${item.original_price}</span>` : "";
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(item.copy)}`;
 
+    let comparisonBox = "";
+    if (item.comparison) {
+        const comp = item.comparison;
+        comparisonBox = `
+            <div class="comparison-alert-box" style="margin: 15px 0; padding: 12px 15px; border-radius: 8px; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.25); display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #10B981;">
+                    <i class="fa-solid fa-circle-info" style="font-size: 1rem;"></i>
+                    <span>Preço menor encontrado na ${comp.store}!</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <span style="font-size: 0.85rem; color: var(--text-secondary);">Preço: <strong style="color: var(--text-primary); font-size: 0.95rem;">${comp.price}</strong></span>
+                    <button class="btn-copy" onclick="copyToClipboardText(this, '${comp.link}')" style="padding: 4px 10px; font-size: 0.80rem; display: inline-flex; align-items: center; gap: 5px;">
+                        <i class="fa-regular fa-copy"></i> Copiar Link da Oferta
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     customPreviewCard.innerHTML = `
         <div class="offer-product-info">
             <div class="offer-thumb-wrapper">
@@ -965,6 +1065,8 @@ function renderCustomPreview(item) {
                 </div>
             </div>
         </div>
+        
+        ${comparisonBox}
         
         <div class="offer-copy-section" style="margin-top: 15px;">
             <div class="copy-header-row">
@@ -991,6 +1093,22 @@ function renderCustomPreview(item) {
     customPreviewCard.style.display = "block";
 }
 window.renderCustomPreview = renderCustomPreview;
+
+function copyToClipboardText(button, text) {
+    if (!text) return;
+    try {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalHTML = button.innerHTML;
+            button.innerHTML = `<i class="fa-solid fa-check"></i> Copiado!`;
+            setTimeout(() => {
+                button.innerHTML = originalHTML;
+            }, 2000);
+        });
+    } catch (e) {
+        showToast("Erro ao copiar link.", "error");
+    }
+}
+window.copyToClipboardText = copyToClipboardText;
 
 // Copy text function for custom generator
 function copyCustomToClipboard(button) {
