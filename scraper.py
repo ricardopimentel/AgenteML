@@ -165,16 +165,89 @@ def scrape_mercado_livre_deals(limit=10, randomize=True):
             print(f"Scraper page {page} exception: {e}")
             continue
             
+        return []
+
+def scrape_shopee_deals(limit=5):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.google.com/"
+    }
+    url = "https://www.promobit.com.br/promocoes/loja/shopee/"
+    deals = []
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, "html.parser")
+            anchors = soup.find_all('a', href=True)
+            
+            seen_ids = set()
+            for a in anchors:
+                try:
+                    href = a['href']
+                    if '/oferta/' in href:
+                        match = re.search(r'-(\d+)/?$', href.strip('/'))
+                        if not match:
+                            continue
+                        offer_id = match.group(1)
+                        if offer_id in seen_ids:
+                            continue
+                        
+                        # 2. Title
+                        title_el = a.find("h2")
+                        title = title_el.text.strip() if title_el else ""
+                        if not title or len(title) < 10:
+                            continue
+                            
+                        seen_ids.add(offer_id)
+                        
+                        # Target Shopee search URL
+                        original_link = f"https://shopee.com.br/search?keyword={urllib.parse.quote(title)}"
+                        
+                        # 3. Price
+                        price_str = "Sob Consulta"
+                        r_span = a.find("span", string=re.compile(r"R\$", re.I))
+                        if r_span:
+                            val_span = r_span.find_next_sibling("span")
+                            if val_span:
+                                price_str = f"R$ {val_span.text.strip()}"
+                                
+                        # 4. Image
+                        img_el = a.find("img")
+                        image_url = ""
+                        if img_el:
+                            image_url = img_el.get("src") or img_el.get("data-src") or ""
+                            
+                        deals.append({
+                            "id": offer_id,
+                            "title": title,
+                            "original_link": original_link,
+                            "affiliate_link": "",
+                            "price": price_str,
+                            "original_price": "",
+                            "discount": "Oferta Shopee",
+                            "image_url": image_url
+                        })
+                except Exception as card_ex:
+                    print(f"Error parsing Promobit Shopee card: {card_ex}")
+                    
+            if deals:
+                import random
+                random.shuffle(deals)
+                return deals[:limit]
+    except Exception as e:
+        print(f"Error scraping Shopee deals: {e}")
     return []
 
 if __name__ == "__main__":
     # Test scraper
-    print("Testing scraper...")
-    items = scrape_mercado_livre_deals(5)
-    print(f"Found {len(items)} promotional items:")
-    for item in items:
-        print(f"- {item['title']}")
-        print(f"  Price: {item['price']} (Was: {item['original_price']}) | Discount: {item['discount']}")
-        print(f"  Link: {item['affiliate_link']}")
-        print(f"  Image: {item['image_url']}")
-        print()
+    print("Testing scrapers...")
+    ml_items = scrape_mercado_livre_deals(3)
+    print(f"Found {len(ml_items)} Mercado Livre promotional items:")
+    for item in ml_items:
+        print(f"- [ML] {item['title']} -> {item['price']}")
+        
+    shopee_items = scrape_shopee_deals(3)
+    print(f"Found {len(shopee_items)} Shopee promotional items:")
+    for item in shopee_items:
+        print(f"- [Shopee] {item['title']} -> {item['price']} (Img: {item['image_url']})")

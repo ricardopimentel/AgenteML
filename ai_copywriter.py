@@ -42,6 +42,17 @@ def generate_whatsapp_copy(title, price, original_price, discount, link):
         response = model.generate_content(prompt)
         copy_text = response.text.strip()
         if copy_text:
+            if link and link != "[LINK_AFILIADO]":
+                copy_text = copy_text.replace(link, "[LINK_AFILIADO]")
+            is_shopee_deal = "shopee" in link.lower() or "shope.ee" in link.lower()
+            if is_shopee_deal:
+                copy_text = copy_text.replace("Mercado Livre", "Shopee").replace("MercadoLivre", "Shopee")
+                copy_text = copy_text.replace("MERCADO LIVRE", "SHOPEE").replace("MERCADOLIVRE", "SHOPEE")
+                copy_text = copy_text.replace("mercado livre", "shopee").replace("mercadolivre", "shopee")
+            else:
+                copy_text = copy_text.replace("Shopee", "Mercado Livre")
+                copy_text = copy_text.replace("SHOPEE", "MERCADO LIVRE")
+                copy_text = copy_text.replace("shopee", "mercado livre")
             return copy_text
             
     except Exception as e:

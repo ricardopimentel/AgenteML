@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const metaImage = document.querySelector('meta[property="og:image"]');
             if (metaImage) image = metaImage.getAttribute('content');
             if (!image) {
-                const imgEl = document.querySelector('img[src*="http2.mlstatic.com"], img[src*="mlstatic.com"], img[src*="shopee.com.br"], img[class*="product"]');
+                const imgEl = document.querySelector('img[src*="http2.mlstatic.com"], img[src*="mlstatic.com"], img[src*="shopee.com.br"], img[src*="sygmcdn.com"], img[src*="shopeemobile.com"], img[src*="/file/"], img[class*="product"]');
                 if (imgEl) image = imgEl.src;
             }
 

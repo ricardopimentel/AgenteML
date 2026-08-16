@@ -83,7 +83,12 @@ def run_agent_flow():
     try:
         # 1. Scrape deals
         log_message("Buscando ofertas do dia no Mercado Livre...")
-        deals = scraper.scrape_mercado_livre_deals(limit=5)
+        ml_deals = scraper.scrape_mercado_livre_deals(limit=5)
+        
+        log_message("Buscando ofertas do dia na Shopee...")
+        shopee_deals = scraper.scrape_shopee_deals(limit=5)
+        
+        deals = ml_deals + shopee_deals
         
         if not deals:
             log_message("Nenhuma oferta promocional encontrada na busca.")
@@ -93,7 +98,7 @@ def run_agent_flow():
             })
             return
             
-        log_message(f"Encontradas {len(deals)} ofertas promocionais. Gerando copies de venda...")
+        log_message(f"Encontradas {len(deals)} ofertas promocionais ({len(ml_deals)} ML, {len(shopee_deals)} Shopee). Gerando copies de venda...")
         
         # 2. Generate copies
         copy_texts = []
@@ -104,7 +109,7 @@ def run_agent_flow():
                 price=deal["price"],
                 original_price=deal["original_price"],
                 discount=deal["discount"],
-                link="[LINK_AFILIADO]"
+                link=deal["original_link"]
             )
             copy_texts.append(copy)
             

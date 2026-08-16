@@ -158,6 +158,7 @@ def generate_custom_offer(data: CustomOfferSchema):
             image_url = "https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/ca5d10df1fb01a8f66086733613696fe.png"
 
         # Search comparison on Mercado Livre by scraping the search listing page via translate mirror
+        ml_image_url = ""
         if title and title != "Produto Shopee":
             try:
                 # Use first 5 words to keep search general and robust
@@ -202,6 +203,11 @@ def generate_custom_offer(data: CustomOfferSchema):
                             except Exception:
                                 original_link = link
                                 
+                        # 3. Image
+                        img_el = best_match.find("img")
+                        if img_el:
+                            ml_image_url = img_el.get("data-src") or img_el.get("src") or ""
+                                
                         # Compare
                         shopee_price_num = 0.0
                         try:
@@ -218,6 +224,10 @@ def generate_custom_offer(data: CustomOfferSchema):
                             }
             except Exception as compare_err:
                 print(f"Error comparing price on ML search scraping: {compare_err}")
+                
+        # If we got a real image from the search match, swap the default Shopee static placeholder
+        if ml_image_url and (not image_url or "shopeemobile.com/shopee" in image_url):
+            image_url = ml_image_url
             
     # 4. Handle Mercado Livre Link
     elif is_meli:
