@@ -157,6 +157,60 @@ def generate_custom_offer(data: CustomOfferSchema):
             price_str = "Sob Consulta"
             image_url = "https://deo.shopeemobile.com/shopee/shopee-pcmall-live-sg/assets/ca5d10df1fb01a8f66086733613696fe.png"
 
+            # Fetch real title and image from Shopee mirror if name segment was missing
+            if not title or title.isdigit() or len(title) < 15:
+                try:
+                    # 1. Try to extract shopid and itemid from resolved URL
+                    shop_id, item_id = None, None
+                    m1 = re.search(r'-i\.(\d+)\.(\d+)', resolved_url)
+                    if m1:
+                        shop_id, item_id = m1.groups()
+                    else:
+                        m2 = re.search(r'/product/(\d+)/(\d+)', resolved_url)
+                        if m2:
+                            shop_id, item_id = m2.groups()
+                        else:
+                            parts = parsed.path.strip("/").split("/")
+                            if len(parts) >= 3 and parts[-2].isdigit() and parts[-1].isdigit():
+                                shop_id = parts[-2]
+                                item_id = parts[-1]
+                                
+                    if shop_id and item_id:
+                        mirror_url = f"https://shopee-com-br.translate.goog/product/{shop_id}/{item_id}?_x_tr_sl=auto&_x_tr_tl=pt&_x_tr_hl=pt-BR"
+                    else:
+                        mirror_url = f"https://shopee-com-br.translate.goog/{parsed.path.lstrip('/')}?_x_tr_sl=auto&_x_tr_tl=pt&_x_tr_hl=pt-BR"
+                        
+                    headers = {
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
+                    }
+                    response = requests.get(mirror_url, headers=headers, timeout=15)
+                    if response.status_code == 200:
+                        import json
+                        soup = BeautifulSoup(response.text, "html.parser")
+                        state_data = None
+                        for s in soup.find_all("script"):
+                            content = s.string or ""
+                            if "initialState" in content and "PDP_BFF_DATA" in content:
+                                try:
+                                    state_data = json.loads(content.strip())
+                                    break
+                                except Exception:
+                                    pass
+                        if state_data:
+                            pdp_data = state_data["initialState"]["DOMAIN_PDP"]["data"]["PDP_BFF_DATA"]["cachedMap"]
+                            key = list(pdp_data.keys())[0]
+                            item = pdp_data[key]["item"]
+                            
+                            name = item.get("name")
+                            if name:
+                                title = name.strip()
+                            
+                            images = item.get("images", [])
+                            if images:
+                                image_url = f"https://down-br-sg.img.sygmcdn.com/file/{images[0]}"
+                except Exception as e:
+                    print(f"Error fetching Shopee mirror state: {e}")
+
         # Search comparison on Mercado Livre by scraping the search listing page via translate mirror
         ml_image_url = ""
         if title and title != "Produto Shopee":
@@ -224,6 +278,14 @@ def generate_custom_offer(data: CustomOfferSchema):
                             }
             except Exception as compare_err:
                 print(f"Error comparing price on ML search scraping: {compare_err}")
+
+        # Fallback Shopee price to Mercado Livre price if empty
+        if not price_str or price_str == "Sob Consulta":
+            try:
+                if 'ml_price_str' in locals() and ml_price_str:
+                    price_str = ml_price_str
+            except Exception:
+                pass
                 
         # If we got a real image from the search match, swap the default Shopee static placeholder
         if ml_image_url and (not image_url or "shopeemobile.com/shopee" in image_url):
