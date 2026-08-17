@@ -1151,7 +1151,7 @@ button[disabled] {
     display: flex;
     justify-content: center;
     gap: 15px;
-    margin-bottom: 25px;
+    margin: 0 auto 25px auto;
     padding: 6px;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border-color);
