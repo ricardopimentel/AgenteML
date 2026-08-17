@@ -207,7 +207,7 @@ def generate_custom_offer(data: CustomOfferSchema):
                             
                             images = item.get("images", [])
                             if images:
-                                image_url = f"https://down-br-sg.img.sygmcdn.com/file/{images[0]}"
+                                image_url = f"https://down-br.img.susercontent.com/file/{images[0]}"
                 except Exception as e:
                     print(f"Error fetching Shopee mirror state: {e}")
 
@@ -215,8 +215,17 @@ def generate_custom_offer(data: CustomOfferSchema):
         ml_image_url = ""
         if title and title != "Produto Shopee":
             try:
-                # Use first 5 words to keep search general and robust
-                q_short = " ".join(title.split()[:5])
+                # Clean search query of quantity boilerplate numbers to keep search general, precise and robust
+                import unicodedata
+                title_clean = "".join([c for c in unicodedata.normalize('NFKD', title) if not unicodedata.combining(c)])
+                q_clean = title_clean.lower()
+                q_clean = re.sub(r'\b(shopee|original|frete grtis|frete gratis|novo|promoo|promocao|oficial|ml)\b', '', q_clean)
+                q_clean = re.sub(r'\b\d+\s*(travas|peas|pecas|pcs|unidades|un|portas|bocas|gavetas)\b', '', q_clean)
+                q_clean = re.sub(r'\b\d+\b(?!v|w|hz|ml|g|gb|tb|hz|k|inch|”|")', '', q_clean)
+                q_clean = re.sub(r'[^\w\s]', ' ', q_clean)
+                words = [w.strip() for w in q_clean.split() if w.strip()]
+                q_short = " ".join(words[:5])
+                
                 slug = q_short.replace(" ", "-")
                 slug = re.sub(r"[^\w\-]", "", slug)
                 
@@ -279,13 +288,12 @@ def generate_custom_offer(data: CustomOfferSchema):
             except Exception as compare_err:
                 print(f"Error comparing price on ML search scraping: {compare_err}")
 
-        # Fallback Shopee price to Mercado Livre price if empty
+        # If the Shopee price is not found, raise an error as requested
         if not price_str or price_str == "Sob Consulta":
-            try:
-                if 'ml_price_str' in locals() and ml_price_str:
-                    price_str = ml_price_str
-            except Exception:
-                pass
+            raise HTTPException(
+                status_code=400,
+                detail="Não foi possível identificar o preço real do produto no site da Shopee. Por favor, use a Extensão do Chrome enquanto visualiza o produto para gerar o anúncio com o preço correto."
+            )
                 
         # If we got a real image from the search match, swap the default Shopee static placeholder
         if ml_image_url and (not image_url or "shopeemobile.com/shopee" in image_url):

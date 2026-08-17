@@ -1,7 +1,7 @@
 import google.generativeai as genai
 from config import Config
 
-def generate_whatsapp_copy(title, price, original_price, discount, link):
+def generate_whatsapp_copy(title, price, original_price, discount, link, brand_link=None):
     """
     Generates an attractive sales description for WhatsApp.
     If the Gemini key is configured, it calls the Gemini API.
@@ -10,9 +10,12 @@ def generate_whatsapp_copy(title, price, original_price, discount, link):
     settings = Config.get_all()
     api_key = settings.get("GEMINI_API_KEY", "")
     
+    # Use brand_link to determine platform if provided
+    detect_link = brand_link if brand_link else link
+    
     if not api_key:
         print("Gemini API key not configured. Using template fallback.")
-        return generate_template_copy(title, price, original_price, discount, link)
+        return generate_template_copy(title, price, original_price, discount, link, detect_link)
         
     try:
         genai.configure(api_key=api_key)
@@ -42,9 +45,7 @@ def generate_whatsapp_copy(title, price, original_price, discount, link):
         response = model.generate_content(prompt)
         copy_text = response.text.strip()
         if copy_text:
-            if link and link != "[LINK_AFILIADO]":
-                copy_text = copy_text.replace(link, "[LINK_AFILIADO]")
-            is_shopee_deal = "shopee" in link.lower() or "shope.ee" in link.lower()
+            is_shopee_deal = "shopee" in detect_link.lower() or "shope.ee" in detect_link.lower() or "s.shopee" in detect_link.lower()
             if is_shopee_deal:
                 copy_text = copy_text.replace("Mercado Livre", "Shopee").replace("MercadoLivre", "Shopee")
                 copy_text = copy_text.replace("MERCADO LIVRE", "SHOPEE").replace("MERCADOLIVRE", "SHOPEE")
@@ -58,16 +59,18 @@ def generate_whatsapp_copy(title, price, original_price, discount, link):
     except Exception as e:
         print(f"Gemini API error: {e}. Using template fallback.")
         
-    return generate_template_copy(title, price, original_price, discount, link)
+    return generate_template_copy(title, price, original_price, discount, link, detect_link)
 
-def generate_template_copy(title, price, original_price, discount, link):
+def generate_template_copy(title, price, original_price, discount, link, detect_link=None):
     """
     Standard template fallback generator.
     """
+    if not detect_link:
+        detect_link = link
     original_line = f"~~{original_price}~~ " if original_price else ""
     
     store_name = "Mercado Livre"
-    if "shopee" in link.lower() or "shope.ee" in link.lower():
+    if "shopee" in detect_link.lower() or "shope.ee" in detect_link.lower() or "s.shopee" in detect_link.lower():
         store_name = "Shopee"
         
     copy = f"""🚨 *OFERTA IMPERDÍVEL NA {store_name.upper()}!* 🚨

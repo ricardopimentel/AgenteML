@@ -109,7 +109,8 @@ def run_agent_flow():
                 price=deal["price"],
                 original_price=deal["original_price"],
                 discount=deal["discount"],
-                link=deal["original_link"]
+                link="[LINK_AFILIADO]",
+                brand_link=deal["original_link"]
             )
             copy_texts.append(copy)
             
